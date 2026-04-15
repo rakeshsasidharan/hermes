@@ -85,4 +85,44 @@ describe('HermesStorageStack', () => {
       });
     });
   });
+
+  describe('Messages table', () => {
+    test('creates Messages DynamoDB table with correct PK', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'Messages',
+        KeySchema: [
+          { AttributeName: 'messageId', KeyType: 'HASH' },
+        ],
+        AttributeDefinitions: Match.arrayWith([
+          { AttributeName: 'messageId', AttributeType: 'S' },
+        ]),
+      });
+    });
+
+    test('Messages table uses PAY_PER_REQUEST billing', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'Messages',
+        BillingMode: 'PAY_PER_REQUEST',
+      });
+    });
+
+    test('Messages table has address-receivedAt-index GSI', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'Messages',
+        GlobalSecondaryIndexes: Match.arrayWith([
+          Match.objectLike({
+            IndexName: 'address-receivedAt-index',
+            KeySchema: [
+              { AttributeName: 'address', KeyType: 'HASH' },
+              { AttributeName: 'receivedAt', KeyType: 'RANGE' },
+            ],
+          }),
+        ]),
+        AttributeDefinitions: Match.arrayWith([
+          { AttributeName: 'address', AttributeType: 'S' },
+          { AttributeName: 'receivedAt', AttributeType: 'S' },
+        ]),
+      });
+    });
+  });
 });
