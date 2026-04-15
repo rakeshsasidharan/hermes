@@ -65,10 +65,16 @@ describe('HermesStorageStack', () => {
     });
   });
 
+  test('S3 bucket is tagged with Project=hermes', () => {
+    template.hasResourceProperties('AWS::S3::Bucket', {
+      Tags: Match.arrayWith([{ Key: 'Project', Value: 'hermes' }]),
+    });
+  });
+
   describe('Addresses table', () => {
-    test('creates Addresses DynamoDB table with correct PK', () => {
+    test('creates hermes-addresses DynamoDB table with correct PK', () => {
       template.hasResourceProperties('AWS::DynamoDB::Table', {
-        TableName: 'Addresses',
+        TableName: 'hermes-addresses',
         KeySchema: [
           { AttributeName: 'email', KeyType: 'HASH' },
         ],
@@ -78,18 +84,25 @@ describe('HermesStorageStack', () => {
       });
     });
 
-    test('Addresses table uses PAY_PER_REQUEST billing', () => {
+    test('hermes-addresses table uses PAY_PER_REQUEST billing', () => {
       template.hasResourceProperties('AWS::DynamoDB::Table', {
-        TableName: 'Addresses',
+        TableName: 'hermes-addresses',
         BillingMode: 'PAY_PER_REQUEST',
+      });
+    });
+
+    test('hermes-addresses table is tagged with Project=hermes', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'hermes-addresses',
+        Tags: Match.arrayWith([{ Key: 'Project', Value: 'hermes' }]),
       });
     });
   });
 
   describe('Messages table', () => {
-    test('creates Messages DynamoDB table with correct PK', () => {
+    test('creates hermes-messages DynamoDB table with correct PK', () => {
       template.hasResourceProperties('AWS::DynamoDB::Table', {
-        TableName: 'Messages',
+        TableName: 'hermes-messages',
         KeySchema: [
           { AttributeName: 'messageId', KeyType: 'HASH' },
         ],
@@ -99,16 +112,16 @@ describe('HermesStorageStack', () => {
       });
     });
 
-    test('Messages table uses PAY_PER_REQUEST billing', () => {
+    test('hermes-messages table uses PAY_PER_REQUEST billing', () => {
       template.hasResourceProperties('AWS::DynamoDB::Table', {
-        TableName: 'Messages',
+        TableName: 'hermes-messages',
         BillingMode: 'PAY_PER_REQUEST',
       });
     });
 
-    test('Messages table has address-receivedAt-index GSI', () => {
+    test('hermes-messages table has address-receivedAt-index GSI', () => {
       template.hasResourceProperties('AWS::DynamoDB::Table', {
-        TableName: 'Messages',
+        TableName: 'hermes-messages',
         GlobalSecondaryIndexes: Match.arrayWith([
           Match.objectLike({
             IndexName: 'address-receivedAt-index',
@@ -122,6 +135,41 @@ describe('HermesStorageStack', () => {
           { AttributeName: 'address', AttributeType: 'S' },
           { AttributeName: 'receivedAt', AttributeType: 'S' },
         ]),
+      });
+    });
+
+    test('hermes-messages table is tagged with Project=hermes', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'hermes-messages',
+        Tags: Match.arrayWith([{ Key: 'Project', Value: 'hermes' }]),
+      });
+    });
+  });
+
+  describe('Drafts table', () => {
+    test('creates hermes-drafts DynamoDB table with correct PK', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'hermes-drafts',
+        KeySchema: [
+          { AttributeName: 'draftId', KeyType: 'HASH' },
+        ],
+        AttributeDefinitions: Match.arrayWith([
+          { AttributeName: 'draftId', AttributeType: 'S' },
+        ]),
+      });
+    });
+
+    test('hermes-drafts table uses PAY_PER_REQUEST billing', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'hermes-drafts',
+        BillingMode: 'PAY_PER_REQUEST',
+      });
+    });
+
+    test('hermes-drafts table is tagged with Project=hermes', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'hermes-drafts',
+        Tags: Match.arrayWith([{ Key: 'Project', Value: 'hermes' }]),
       });
     });
   });
