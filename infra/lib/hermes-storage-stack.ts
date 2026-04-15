@@ -3,6 +3,8 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import { Construct } from 'constructs';
 
+const HERMES_TAG = { key: 'Project', value: 'hermes' };
+
 export class HermesStorageStack extends cdk.Stack {
   public readonly emailBucket: s3.Bucket;
   public readonly addressesTable: dynamodb.Table;
@@ -27,32 +29,35 @@ export class HermesStorageStack extends cdk.Stack {
       ],
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
+    cdk.Tags.of(this.emailBucket).add(HERMES_TAG.key, HERMES_TAG.value);
 
     this.addressesTable = new dynamodb.Table(this, 'AddressesTable', {
-      tableName: 'Addresses',
+      tableName: 'hermes-addresses',
       partitionKey: { name: 'email', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
+    cdk.Tags.of(this.addressesTable).add(HERMES_TAG.key, HERMES_TAG.value);
 
     this.messagesTable = new dynamodb.Table(this, 'MessagesTable', {
-      tableName: 'Messages',
+      tableName: 'hermes-messages',
       partitionKey: { name: 'messageId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
-
     this.messagesTable.addGlobalSecondaryIndex({
       indexName: 'address-receivedAt-index',
       partitionKey: { name: 'address', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'receivedAt', type: dynamodb.AttributeType.STRING },
     });
+    cdk.Tags.of(this.messagesTable).add(HERMES_TAG.key, HERMES_TAG.value);
 
     this.draftsTable = new dynamodb.Table(this, 'DraftsTable', {
-      tableName: 'Drafts',
+      tableName: 'hermes-drafts',
       partitionKey: { name: 'draftId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
+    cdk.Tags.of(this.draftsTable).add(HERMES_TAG.key, HERMES_TAG.value);
   }
 }
