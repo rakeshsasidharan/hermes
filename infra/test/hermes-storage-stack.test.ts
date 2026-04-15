@@ -64,4 +64,25 @@ describe('HermesStorageStack', () => {
       BucketName: 'hermes-email-store',
     });
   });
+
+  describe('Addresses table', () => {
+    test('creates Addresses DynamoDB table with correct PK', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'Addresses',
+        KeySchema: [
+          { AttributeName: 'email', KeyType: 'HASH' },
+        ],
+        AttributeDefinitions: Match.arrayWith([
+          { AttributeName: 'email', AttributeType: 'S' },
+        ]),
+      });
+    });
+
+    test('Addresses table uses PAY_PER_REQUEST billing', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'Addresses',
+        BillingMode: 'PAY_PER_REQUEST',
+      });
+    });
+  });
 });
