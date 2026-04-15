@@ -125,4 +125,25 @@ describe('HermesStorageStack', () => {
       });
     });
   });
+
+  describe('Drafts table', () => {
+    test('creates Drafts DynamoDB table with correct PK', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'Drafts',
+        KeySchema: [
+          { AttributeName: 'draftId', KeyType: 'HASH' },
+        ],
+        AttributeDefinitions: Match.arrayWith([
+          { AttributeName: 'draftId', AttributeType: 'S' },
+        ]),
+      });
+    });
+
+    test('Drafts table uses PAY_PER_REQUEST billing', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'Drafts',
+        BillingMode: 'PAY_PER_REQUEST',
+      });
+    });
+  });
 });

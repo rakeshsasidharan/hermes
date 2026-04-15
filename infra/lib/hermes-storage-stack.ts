@@ -7,6 +7,7 @@ export class HermesStorageStack extends cdk.Stack {
   public readonly emailBucket: s3.Bucket;
   public readonly addressesTable: dynamodb.Table;
   public readonly messagesTable: dynamodb.Table;
+  public readonly draftsTable: dynamodb.Table;
 
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -45,6 +46,13 @@ export class HermesStorageStack extends cdk.Stack {
       indexName: 'address-receivedAt-index',
       partitionKey: { name: 'address', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'receivedAt', type: dynamodb.AttributeType.STRING },
+    });
+
+    this.draftsTable = new dynamodb.Table(this, 'DraftsTable', {
+      tableName: 'Drafts',
+      partitionKey: { name: 'draftId', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
   }
 }
