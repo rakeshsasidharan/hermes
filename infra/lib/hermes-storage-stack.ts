@@ -10,6 +10,7 @@ export class HermesStorageStack extends cdk.Stack {
   public readonly addressesTable: dynamodb.Table;
   public readonly messagesTable: dynamodb.Table;
   public readonly draftsTable: dynamodb.Table;
+  public readonly wsConnectionsTable: dynamodb.Table;
 
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -59,5 +60,14 @@ export class HermesStorageStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
     cdk.Tags.of(this.draftsTable).add(HERMES_TAG.key, HERMES_TAG.value);
+
+    this.wsConnectionsTable = new dynamodb.Table(this, 'WsConnectionsTable', {
+      tableName: 'hermes-ws-connections',
+      partitionKey: { name: 'connectionId', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      timeToLiveAttribute: 'ttl',
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+    cdk.Tags.of(this.wsConnectionsTable).add(HERMES_TAG.key, HERMES_TAG.value);
   }
 }
