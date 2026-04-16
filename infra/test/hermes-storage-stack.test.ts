@@ -173,4 +173,42 @@ describe('HermesStorageStack', () => {
       });
     });
   });
+
+  describe('WsConnections table', () => {
+    test('creates hermes-ws-connections DynamoDB table with correct PK', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'hermes-ws-connections',
+        KeySchema: [
+          { AttributeName: 'connectionId', KeyType: 'HASH' },
+        ],
+        AttributeDefinitions: Match.arrayWith([
+          { AttributeName: 'connectionId', AttributeType: 'S' },
+        ]),
+      });
+    });
+
+    test('hermes-ws-connections table uses PAY_PER_REQUEST billing', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'hermes-ws-connections',
+        BillingMode: 'PAY_PER_REQUEST',
+      });
+    });
+
+    test('hermes-ws-connections table has TTL enabled on ttl attribute', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'hermes-ws-connections',
+        TimeToLiveSpecification: {
+          AttributeName: 'ttl',
+          Enabled: true,
+        },
+      });
+    });
+
+    test('hermes-ws-connections table is tagged with Project=hermes', () => {
+      template.hasResourceProperties('AWS::DynamoDB::Table', {
+        TableName: 'hermes-ws-connections',
+        Tags: Match.arrayWith([{ Key: 'Project', Value: 'hermes' }]),
+      });
+    });
+  });
 });
