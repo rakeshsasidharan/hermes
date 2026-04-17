@@ -3,6 +3,7 @@ import * as cdk from 'aws-cdk-lib/core';
 import { HermesStorageStack } from '../lib/hermes-storage-stack';
 import { HermesEmailStack } from '../lib/hermes-email-stack';
 import { HermesWebSocketStack } from '../lib/hermes-websocket-stack';
+import { HermesAppStack } from '../lib/hermes-app-stack';
 
 const app = new cdk.App();
 
@@ -25,4 +26,15 @@ new HermesEmailStack(app, 'HermesEmailStack', {
   wsConnectionsTable: storageStack.wsConnectionsTable,
   websocketApiEndpoint: webSocketStack.webSocketEndpoint,
   websocketApiArn: webSocketStack.webSocketApiArn,
+});
+
+new HermesAppStack(app, 'HermesAppStack', {
+  env,
+  emailBucket: storageStack.emailBucket,
+  addressesTable: storageStack.addressesTable,
+  messagesTable: storageStack.messagesTable,
+  draftsTable: storageStack.draftsTable,
+  wsConnectionsTable: storageStack.wsConnectionsTable,
+  sesRuleSetName: 'hermes-receipt-rules',
+  websocketEndpoint: webSocketStack.webSocketEndpoint,
 });
