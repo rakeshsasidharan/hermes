@@ -20,5 +20,9 @@ const webSocketStack = new HermesWebSocketStack(app, 'HermesWebSocketStack', {
 
 new HermesEmailStack(app, 'HermesEmailStack', {
   env,
-  emailBucketArn: storageStack.emailBucket.bucketArn,
+  emailBucket: storageStack.emailBucket,
+  messagesTable: storageStack.messagesTable,
+  wsConnectionsTable: storageStack.wsConnectionsTable,
+  websocketApiEndpoint: webSocketStack.webSocketEndpoint,
+  websocketApiArn: webSocketStack.webSocketApiArn,
 });
