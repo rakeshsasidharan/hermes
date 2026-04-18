@@ -183,6 +183,14 @@ export class HermesAppStack extends cdk.Stack {
       instanceConfiguration: {
         instanceRoleArn: instanceRole.roleArn,
       },
+      healthCheckConfiguration: {
+        protocol: 'HTTP',
+        path: '/login',
+        interval: 10,
+        timeout: 5,
+        healthyThreshold: 1,
+        unhealthyThreshold: 5,
+      },
       autoScalingConfigurationArn: autoScaling.attrAutoScalingConfigurationArn,
     });
     cdk.Tags.of(appRunnerService).add(HERMES_TAG.key, HERMES_TAG.value);
