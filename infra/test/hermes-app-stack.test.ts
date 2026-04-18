@@ -85,25 +85,26 @@ describe('HermesAppStack', () => {
     });
   });
 
-  describe('ECR Repository (#12)', () => {
-    test('creates ECR repository named hermes-app', () => {
-      template.hasResourceProperties('AWS::ECR::Repository', {
-        RepositoryName: 'hermes-app',
-      });
+  describe('Docker image asset (#12)', () => {
+    test('DockerImageAsset does not create a named ECR repository in the stack', () => {
+      // The image is pushed to the CDK bootstrap ECR repo, which lives outside
+      // this stack — no AWS::ECR::Repository resource should appear here.
+      template.resourceCountIs('AWS::ECR::Repository', 0);
     });
 
-    test('image scan on push is enabled', () => {
-      template.hasResourceProperties('AWS::ECR::Repository', {
-        ImageScanningConfiguration: {
-          ScanOnPush: true,
-        },
-      });
-    });
-
-    test('lifecycle policy keeps last 10 images', () => {
-      template.hasResourceProperties('AWS::ECR::Repository', {
-        LifecyclePolicy: {
-          LifecyclePolicyText: Match.stringLikeRegexp('"countNumber":10'),
+    test('App Runner access role has ECR pull permissions granted by the image asset', () => {
+      template.hasResourceProperties('AWS::IAM::Policy', {
+        PolicyDocument: {
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              Action: Match.arrayWith([
+                'ecr:BatchCheckLayerAvailability',
+                'ecr:GetDownloadUrlForLayer',
+                'ecr:BatchGetImage',
+              ]),
+              Effect: 'Allow',
+            }),
+          ]),
         },
       });
     });

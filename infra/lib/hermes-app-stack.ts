@@ -1,11 +1,12 @@
+import * as path from 'path';
 import * as cdk from 'aws-cdk-lib/core';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
-import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as apprunner from 'aws-cdk-lib/aws-apprunner';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import { DockerImageAsset } from 'aws-cdk-lib/aws-ecr-assets';
 import { Construct } from 'constructs';
 
 const HERMES_TAG = { key: 'Project', value: 'hermes' };
@@ -23,7 +24,6 @@ export interface HermesAppStackProps extends cdk.StackProps {
 export class HermesAppStack extends cdk.Stack {
   public readonly userPool: cognito.CfnUserPool;
   public readonly userPoolClient: cognito.CfnUserPoolClient;
-  public readonly ecrRepository: ecr.Repository;
 
   constructor(scope: Construct, id: string, props: HermesAppStackProps) {
     super(scope, id, props);
@@ -90,18 +90,13 @@ export class HermesAppStack extends cdk.Stack {
       description: 'Hermes Cognito App Client ID',
     });
 
-    // ── ECR Repository (#12) ────────────────────────────────────────────────
+    // ── Docker image asset (#12) ────────────────────────────────────────────
+    // CDK builds the Next.js image and pushes it to the bootstrap ECR repo on
+    // every `cdk deploy`. App Runner is updated to the new image URI automatically.
 
-    this.ecrRepository = new ecr.Repository(this, 'AppRepository', {
-      repositoryName: 'hermes-app',
-      imageScanOnPush: true,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    const appImage = new DockerImageAsset(this, 'AppImage', {
+      directory: path.join(__dirname, '../../app'),
     });
-    this.ecrRepository.addLifecycleRule({
-      description: 'Keep last 10 images',
-      maxImageCount: 10,
-    });
-    cdk.Tags.of(this.ecrRepository).add(HERMES_TAG.key, HERMES_TAG.value);
 
     // ── App Runner (#13) ────────────────────────────────────────────────────
 
@@ -112,6 +107,7 @@ export class HermesAppStack extends cdk.Stack {
     accessRole.addManagedPolicy(
       iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSAppRunnerServicePolicyForECRAccess'),
     );
+    appImage.repository.grantPull(accessRole);
     cdk.Tags.of(accessRole).add(HERMES_TAG.key, HERMES_TAG.value);
 
     const instanceRole = new iam.Role(this, 'AppRunnerInstanceRole', {
@@ -166,7 +162,7 @@ export class HermesAppStack extends cdk.Stack {
           accessRoleArn: accessRole.roleArn,
         },
         imageRepository: {
-          imageIdentifier: `${this.ecrRepository.repositoryUri}:latest`,
+          imageIdentifier: appImage.imageUri,
           imageRepositoryType: 'ECR',
           imageConfiguration: {
             port: '3000',
