@@ -20,6 +20,7 @@ export class HermesStorageStack extends cdk.Stack {
       encryption: s3.BucketEncryption.S3_MANAGED,
       versioned: true,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      eventBridgeEnabled: true,
       lifecycleRules: [
         {
           id: 'expire-uploads',

@@ -137,5 +137,19 @@ describe('HermesEmailStack', () => {
         },
       });
     });
+
+    test('EventBridge rule triggers InboundEmailProcessor on inbound/ prefix', () => {
+      template.hasResourceProperties('AWS::Events::Rule', {
+        Name: 'hermes-inbound-email-rule',
+        EventPattern: Match.objectLike({
+          source: ['aws.s3'],
+          'detail-type': ['Object Created'],
+          detail: {
+            bucket: { name: ['hermes-email-store'] },
+            object: { key: [{ prefix: 'inbound/' }] },
+          },
+        }),
+      });
+    });
   });
 });
