@@ -6,7 +6,7 @@ import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as apprunner from 'aws-cdk-lib/aws-apprunner';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
-import { DockerImageAsset, Platform } from 'aws-cdk-lib/aws-ecr-assets';
+import { DockerImageAsset } from 'aws-cdk-lib/aws-ecr-assets';
 import { Construct } from 'constructs';
 
 const HERMES_TAG = { key: 'Project', value: 'hermes' };
@@ -96,7 +96,6 @@ export class HermesAppStack extends cdk.Stack {
 
     const appImage = new DockerImageAsset(this, 'AppImage', {
       directory: path.join(__dirname, '../../app'),
-      platform: Platform.LINUX_AMD64,
     });
 
     // ── App Runner (#13) ────────────────────────────────────────────────────
