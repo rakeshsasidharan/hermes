@@ -186,6 +186,15 @@ describe('HermesAppStack', () => {
       });
     });
 
+    test('health check uses /login path so middleware redirect does not fail the check (#62)', () => {
+      template.hasResourceProperties('AWS::AppRunner::Service', {
+        HealthCheckConfiguration: {
+          Protocol: 'HTTP',
+          Path: '/login',
+        },
+      });
+    });
+
     test('outputs App Runner service URL', () => {
       template.hasOutput('AppRunnerServiceUrlOutput', {
         Export: { Name: 'HermesAppRunnerServiceUrl' },
