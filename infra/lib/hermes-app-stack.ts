@@ -171,7 +171,6 @@ export class HermesAppStack extends cdk.Stack {
         COGNITO_USER_POOL_ID: this.userPool.ref,
         COGNITO_CLIENT_ID: this.userPoolClient.ref,
         WEBSOCKET_ENDPOINT: props.websocketEndpoint,
-        ...(props.domainName ? { APP_DOMAIN: props.domainName } : {}),
       },
     });
     cdk.Tags.of(appFunction).add(HERMES_TAG.key, HERMES_TAG.value);
