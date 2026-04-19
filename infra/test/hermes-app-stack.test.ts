@@ -258,6 +258,17 @@ describe('HermesAppStack', () => {
       domainTemplate = Template.fromStack(stack);
     });
 
+    test('Lambda has APP_DOMAIN env var set to custom domain', () => {
+      domainTemplate.hasResourceProperties('AWS::Lambda::Function', {
+        FunctionName: 'hermes-app',
+        Environment: {
+          Variables: Match.objectLike({
+            APP_DOMAIN: 'hermes.rpillai.dev',
+          }),
+        },
+      });
+    });
+
     test('CloudFront distribution has hermes.rpillai.dev as alias', () => {
       domainTemplate.hasResourceProperties('AWS::CloudFront::Distribution', {
         DistributionConfig: Match.objectLike({
