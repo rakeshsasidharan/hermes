@@ -178,6 +178,33 @@ describe('HermesAppStack', () => {
     });
   });
 
+  describe('EventBridge warmer', () => {
+    test('creates warmer rule named hermes-app-warmer', () => {
+      template.hasResourceProperties('AWS::Events::Rule', {
+        Name: 'hermes-app-warmer',
+        ScheduleExpression: 'rate(5 minutes)',
+        State: 'ENABLED',
+      });
+    });
+
+    test('warmer rule targets the hermes-app Lambda', () => {
+      template.hasResourceProperties('AWS::Events::Rule', {
+        Targets: Match.arrayWith([
+          Match.objectLike({
+            Input: JSON.stringify({ source: 'hermes-warmer' }),
+          }),
+        ]),
+      });
+    });
+
+    test('Lambda has permission for EventBridge to invoke it', () => {
+      template.hasResourceProperties('AWS::Lambda::Permission', {
+        Action: 'lambda:InvokeFunction',
+        Principal: 'events.amazonaws.com',
+      });
+    });
+  });
+
   describe('Removal policies', () => {
     test('admin secret has DeletionPolicy Delete', () => {
       const resources = template.toJSON().Resources;
