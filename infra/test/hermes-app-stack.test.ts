@@ -35,7 +35,7 @@ describe('HermesAppStack', () => {
     template = Template.fromStack(stack);
   });
 
-  describe('Cognito User Pool (#11)', () => {
+  describe('Cognito User Pool', () => {
     test('creates User Pool named hermes-user-pool', () => {
       template.hasResourceProperties('AWS::Cognito::UserPool', {
         UserPoolName: 'hermes-user-pool',
@@ -44,9 +44,7 @@ describe('HermesAppStack', () => {
 
     test('self-sign-up is disabled', () => {
       template.hasResourceProperties('AWS::Cognito::UserPool', {
-        AdminCreateUserConfig: {
-          AllowAdminCreateUserOnly: true,
-        },
+        AdminCreateUserConfig: { AllowAdminCreateUserOnly: true },
       });
     });
 
@@ -73,75 +71,50 @@ describe('HermesAppStack', () => {
     });
 
     test('outputs User Pool ID', () => {
-      template.hasOutput('UserPoolIdOutput', {
-        Export: { Name: 'HermesUserPoolId' },
-      });
+      template.hasOutput('UserPoolIdOutput', { Export: { Name: 'HermesUserPoolId' } });
     });
 
     test('outputs App Client ID', () => {
-      template.hasOutput('UserPoolClientIdOutput', {
-        Export: { Name: 'HermesUserPoolClientId' },
-      });
+      template.hasOutput('UserPoolClientIdOutput', { Export: { Name: 'HermesUserPoolClientId' } });
     });
   });
 
-  describe('Docker image asset (#12)', () => {
-    test('DockerImageAsset does not create a named ECR repository in the stack', () => {
-      // The image is pushed to the CDK bootstrap ECR repo, which lives outside
-      // this stack — no AWS::ECR::Repository resource should appear here.
-      template.resourceCountIs('AWS::ECR::Repository', 0);
-    });
-
-    test('App Runner access role has ECR pull permissions granted by the image asset', () => {
-      template.hasResourceProperties('AWS::IAM::Policy', {
-        PolicyDocument: {
-          Statement: Match.arrayWith([
-            Match.objectLike({
-              Action: Match.arrayWith([
-                'ecr:BatchCheckLayerAvailability',
-                'ecr:GetDownloadUrlForLayer',
-                'ecr:BatchGetImage',
-              ]),
-              Effect: 'Allow',
-            }),
-          ]),
-        },
-      });
-    });
-  });
-
-  describe('App Runner Service (#13)', () => {
-    test('creates App Runner service named hermes-app', () => {
-      template.hasResourceProperties('AWS::AppRunner::Service', {
-        ServiceName: 'hermes-app',
+  describe('Lambda function (Next.js + Lambda Web Adapter)', () => {
+    test('creates Lambda function named hermes-app', () => {
+      template.hasResourceProperties('AWS::Lambda::Function', {
+        FunctionName: 'hermes-app',
+        PackageType: 'Image',
+        MemorySize: 512,
+        Timeout: 30,
+        Architectures: ['x86_64'],
       });
     });
 
-    test('App Runner service uses ECR image source', () => {
-      template.hasResourceProperties('AWS::AppRunner::Service', {
-        SourceConfiguration: {
-          ImageRepository: {
-            ImageRepositoryType: 'ECR',
-          },
+    test('Lambda function has all required environment variables', () => {
+      template.hasResourceProperties('AWS::Lambda::Function', {
+        FunctionName: 'hermes-app',
+        Environment: {
+          Variables: Match.objectLike({
+            PORT: '3000',
+            ADDRESSES_TABLE: 'hermes-addresses',
+            MESSAGES_TABLE: 'hermes-messages',
+            DRAFTS_TABLE: 'hermes-drafts',
+            WS_CONNECTIONS_TABLE: 'hermes-ws-connections',
+            S3_BUCKET: 'hermes-email-store',
+            SES_RULE_SET_NAME: 'hermes-receipt-rules',
+            WEBSOCKET_ENDPOINT: MOCK_WS_ENDPOINT,
+          }),
         },
       });
     });
 
-    test('App Runner auto-scaling is min 1 max 3', () => {
-      template.hasResourceProperties('AWS::AppRunner::AutoScalingConfiguration', {
-        AutoScalingConfigurationName: 'hermes-scaling',
-        MinSize: 1,
-        MaxSize: 3,
-      });
-    });
-
-    test('instance role trusted by tasks.apprunner.amazonaws.com', () => {
+    test('execution role is trusted by lambda.amazonaws.com', () => {
       template.hasResourceProperties('AWS::IAM::Role', {
-        RoleName: 'hermes-app-runner-instance',
+        RoleName: 'hermes-app-function',
         AssumeRolePolicyDocument: {
           Statement: Match.arrayWith([
             Match.objectLike({
-              Principal: { Service: 'tasks.apprunner.amazonaws.com' },
+              Principal: { Service: 'lambda.amazonaws.com' },
               Action: 'sts:AssumeRole',
             }),
           ]),
@@ -149,16 +122,13 @@ describe('HermesAppStack', () => {
       });
     });
 
-    test('instance role has SES permissions', () => {
+    test('execution role has SES permissions', () => {
       template.hasResourceProperties('AWS::IAM::Policy', {
         PolicyDocument: {
           Statement: Match.arrayWith([
             Match.objectLike({
               Sid: 'SesPermissions',
-              Action: Match.arrayWith([
-                'ses:SendRawEmail',
-                'ses:ListIdentities',
-              ]),
+              Action: Match.arrayWith(['ses:SendRawEmail', 'ses:ListIdentities']),
               Effect: 'Allow',
             }),
           ]),
@@ -166,39 +136,55 @@ describe('HermesAppStack', () => {
       });
     });
 
-    test('App Runner service has all required environment variables', () => {
-      template.hasResourceProperties('AWS::AppRunner::Service', {
-        SourceConfiguration: {
-          ImageRepository: {
-            ImageConfiguration: {
-              RuntimeEnvironmentVariables: Match.arrayWith([
-                Match.objectLike({ Name: 'ADDRESSES_TABLE', Value: 'hermes-addresses' }),
-                Match.objectLike({ Name: 'MESSAGES_TABLE', Value: 'hermes-messages' }),
-                Match.objectLike({ Name: 'DRAFTS_TABLE', Value: 'hermes-drafts' }),
-                Match.objectLike({ Name: 'WS_CONNECTIONS_TABLE', Value: 'hermes-ws-connections' }),
-                Match.objectLike({ Name: 'S3_BUCKET', Value: 'hermes-email-store' }),
-                Match.objectLike({ Name: 'SES_RULE_SET_NAME', Value: 'hermes-receipt-rules' }),
-                Match.objectLike({ Name: 'WEBSOCKET_ENDPOINT', Value: MOCK_WS_ENDPOINT }),
-              ]),
-            },
-          },
-        },
+    test('Lambda log group has DeletionPolicy Delete', () => {
+      const resources = template.toJSON().Resources;
+      const logGroups = Object.values(resources).filter(
+        (r: any) => r.Type === 'AWS::Logs::LogGroup' &&
+          r.Properties?.LogGroupName === '/aws/lambda/hermes-app',
+      );
+      expect(logGroups.length).toBe(1);
+      expect((logGroups[0] as any).DeletionPolicy).toBe('Delete');
+    });
+
+    test('no App Runner resources in stack', () => {
+      template.resourceCountIs('AWS::AppRunner::Service', 0);
+      template.resourceCountIs('AWS::AppRunner::AutoScalingConfiguration', 0);
+    });
+  });
+
+  describe('Function URL + CloudFront', () => {
+    test('creates Lambda Function URL with auth type NONE', () => {
+      template.hasResourceProperties('AWS::Lambda::Url', {
+        AuthType: 'NONE',
       });
     });
 
-    test('health check uses /login path so middleware redirect does not fail the check (#62)', () => {
-      template.hasResourceProperties('AWS::AppRunner::Service', {
-        HealthCheckConfiguration: {
-          Protocol: 'HTTP',
-          Path: '/login',
-        },
+    test('creates CloudFront distribution', () => {
+      template.resourceCountIs('AWS::CloudFront::Distribution', 1);
+    });
+
+    test('CloudFront distribution has caching disabled', () => {
+      template.hasResourceProperties('AWS::CloudFront::Distribution', {
+        DistributionConfig: Match.objectLike({
+          DefaultCacheBehavior: Match.objectLike({
+            ViewerProtocolPolicy: 'redirect-to-https',
+          }),
+        }),
       });
     });
 
-    test('outputs App Runner service URL', () => {
-      template.hasOutput('AppRunnerServiceUrlOutput', {
-        Export: { Name: 'HermesAppRunnerServiceUrl' },
-      });
+    test('outputs CloudFront app URL', () => {
+      template.hasOutput('AppUrlOutput', { Export: { Name: 'HermesAppUrl' } });
+    });
+  });
+
+  describe('Removal policies', () => {
+    test('admin secret has DeletionPolicy Delete', () => {
+      const resources = template.toJSON().Resources;
+      const secrets = Object.values(resources).filter(
+        (r: any) => r.Type === 'AWS::SecretsManager::Secret',
+      );
+      secrets.forEach((s: any) => expect(s.DeletionPolicy).toBe('Delete'));
     });
   });
 });

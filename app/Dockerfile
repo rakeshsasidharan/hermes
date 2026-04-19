@@ -29,6 +29,8 @@ ENV NEXT_TELEMETRY_DISABLED 1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.8.4 /lambda-adapter /opt/extensions/lambda-adapter
+
 COPY --from=builder /app/public ./public
 
 RUN mkdir .next && chown nextjs:nodejs .next
@@ -41,6 +43,6 @@ USER nextjs
 EXPOSE 3000
 
 ENV PORT 3000
-ENV HOSTNAME "0.0.0.0"
+ENV READINESS_CHECK_PATH "/login"
 
 CMD ["node", "server.js"]
