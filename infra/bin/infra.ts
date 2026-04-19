@@ -4,6 +4,7 @@ import { HermesStorageStack } from '../lib/hermes-storage-stack';
 import { HermesEmailStack } from '../lib/hermes-email-stack';
 import { HermesWebSocketStack } from '../lib/hermes-websocket-stack';
 import { HermesAppStack } from '../lib/hermes-app-stack';
+import { HermesCertStack } from '../lib/hermes-cert-stack';
 
 const app = new cdk.App();
 
@@ -11,6 +12,9 @@ const env = {
   account: process.env.CDK_DEFAULT_ACCOUNT,
   region: process.env.CDK_DEFAULT_REGION,
 };
+
+const DOMAIN_NAME = 'hermes.rpillai.dev';
+const HOSTED_ZONE_DOMAIN = 'rpillai.dev';
 
 const storageStack = new HermesStorageStack(app, 'HermesStorageStack', { env });
 
@@ -28,8 +32,17 @@ new HermesEmailStack(app, 'HermesEmailStack', {
   websocketApiArn: webSocketStack.webSocketApiArn,
 });
 
+// ACM certificate must be in us-east-1 for CloudFront.
+const certStack = new HermesCertStack(app, 'HermesCertStack', {
+  env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: 'us-east-1' },
+  domainName: DOMAIN_NAME,
+  hostedZoneDomainName: HOSTED_ZONE_DOMAIN,
+  crossRegionReferences: true,
+});
+
 new HermesAppStack(app, 'HermesAppStack', {
   env,
+  crossRegionReferences: true,
   emailBucket: storageStack.emailBucket,
   addressesTable: storageStack.addressesTable,
   messagesTable: storageStack.messagesTable,
@@ -37,4 +50,7 @@ new HermesAppStack(app, 'HermesAppStack', {
   wsConnectionsTable: storageStack.wsConnectionsTable,
   sesRuleSetName: 'hermes-receipt-rules',
   websocketEndpoint: webSocketStack.webSocketEndpoint,
+  domainName: DOMAIN_NAME,
+  certificate: certStack.certificate,
+  hostedZoneDomainName: HOSTED_ZONE_DOMAIN,
 });
