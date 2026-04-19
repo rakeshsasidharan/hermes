@@ -2,6 +2,7 @@ import * as cdk from 'aws-cdk-lib/core';
 import * as ses from 'aws-cdk-lib/aws-ses';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as eventTargets from 'aws-cdk-lib/aws-events-targets';
@@ -54,11 +55,17 @@ export class HermesEmailStack extends cdk.Stack {
 
     cdk.Tags.of(this.sesS3DeliveryRole).add(HERMES_TAG.key, HERMES_TAG.value);
 
+    const processorLogGroup = new logs.LogGroup(this, 'InboundEmailProcessorLogGroup', {
+      logGroupName: '/aws/lambda/hermes-inbound-email-processor',
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     this.inboundEmailProcessor = new lambda.Function(this, 'InboundEmailProcessor', {
       functionName: 'hermes-inbound-email-processor',
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../lambda/inbound-email-processor')),
+      logGroup: processorLogGroup,
       environment: {
         MESSAGES_TABLE: props.messagesTable.tableName,
         WS_CONNECTIONS_TABLE: props.wsConnectionsTable.tableName,

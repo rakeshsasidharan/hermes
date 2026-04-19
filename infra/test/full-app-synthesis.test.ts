@@ -1,51 +1,71 @@
 import * as cdk from 'aws-cdk-lib/core';
+import { Template } from 'aws-cdk-lib/assertions';
 import { HermesStorageStack } from '../lib/hermes-storage-stack';
 import { HermesEmailStack } from '../lib/hermes-email-stack';
 import { HermesWebSocketStack } from '../lib/hermes-websocket-stack';
 import { HermesAppStack } from '../lib/hermes-app-stack';
 
-/**
- * Full app synthesis integration test.
- *
- * Instantiates all four stacks together the same way bin/infra.ts does.
- * This catches cross-stack circular dependencies that per-stack unit tests
- * cannot detect, because those tests mock the cross-stack resource handles.
- */
+const STATEFUL_TYPES = [
+  'AWS::DynamoDB::Table',
+  'AWS::S3::Bucket',
+  'AWS::Logs::LogGroup',
+  'AWS::SecretsManager::Secret',
+];
+
+function buildApp() {
+  const app = new cdk.App();
+  const env = { account: '123456789012', region: 'us-east-1' };
+
+  const storageStack = new HermesStorageStack(app, 'HermesStorageStack', { env });
+
+  const webSocketStack = new HermesWebSocketStack(app, 'HermesWebSocketStack', {
+    env,
+    wsConnectionsTable: storageStack.wsConnectionsTable,
+  });
+
+  new HermesEmailStack(app, 'HermesEmailStack', {
+    env,
+    emailBucket: storageStack.emailBucket,
+    messagesTable: storageStack.messagesTable,
+    wsConnectionsTable: storageStack.wsConnectionsTable,
+    websocketApiEndpoint: webSocketStack.webSocketEndpoint,
+    websocketApiArn: webSocketStack.webSocketApiArn,
+  });
+
+  new HermesAppStack(app, 'HermesAppStack', {
+    env,
+    emailBucket: storageStack.emailBucket,
+    addressesTable: storageStack.addressesTable,
+    messagesTable: storageStack.messagesTable,
+    draftsTable: storageStack.draftsTable,
+    wsConnectionsTable: storageStack.wsConnectionsTable,
+    sesRuleSetName: 'hermes-receipt-rules',
+    websocketEndpoint: webSocketStack.webSocketEndpoint,
+  });
+
+  app.synth();
+  return app;
+}
+
 describe('Full CDK app synthesis (integration)', () => {
   test('all stacks synthesise together without errors', () => {
-    expect(() => {
-      const app = new cdk.App();
+    expect(() => buildApp()).not.toThrow();
+  });
 
-      const env = { account: '123456789012', region: 'us-east-1' };
+  test('no stateful resource has DeletionPolicy Retain across any stack', () => {
+    const app = buildApp();
+    const stackIds = ['HermesStorageStack', 'HermesWebSocketStack', 'HermesEmailStack', 'HermesAppStack'];
 
-      const storageStack = new HermesStorageStack(app, 'HermesStorageStack', { env });
+    for (const stackId of stackIds) {
+      const stack = app.node.findChild(stackId) as cdk.Stack;
+      const resources = Template.fromStack(stack).toJSON().Resources;
 
-      const webSocketStack = new HermesWebSocketStack(app, 'HermesWebSocketStack', {
-        env,
-        wsConnectionsTable: storageStack.wsConnectionsTable,
-      });
-
-      new HermesEmailStack(app, 'HermesEmailStack', {
-        env,
-        emailBucket: storageStack.emailBucket,
-        messagesTable: storageStack.messagesTable,
-        wsConnectionsTable: storageStack.wsConnectionsTable,
-        websocketApiEndpoint: webSocketStack.webSocketEndpoint,
-        websocketApiArn: webSocketStack.webSocketApiArn,
-      });
-
-      new HermesAppStack(app, 'HermesAppStack', {
-        env,
-        emailBucket: storageStack.emailBucket,
-        addressesTable: storageStack.addressesTable,
-        messagesTable: storageStack.messagesTable,
-        draftsTable: storageStack.draftsTable,
-        wsConnectionsTable: storageStack.wsConnectionsTable,
-        sesRuleSetName: 'hermes-receipt-rules',
-        websocketEndpoint: webSocketStack.webSocketEndpoint,
-      });
-
-      app.synth();
-    }).not.toThrow();
+      for (const [logicalId, resource] of Object.entries(resources as Record<string, any>)) {
+        if (STATEFUL_TYPES.includes(resource.Type)) {
+          expect({ stack: stackId, id: logicalId, policy: resource.DeletionPolicy })
+            .toMatchObject({ policy: 'Delete' });
+        }
+      }
+    }
   });
 });

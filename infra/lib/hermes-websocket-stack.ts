@@ -1,5 +1,6 @@
 import * as cdk from 'aws-cdk-lib/core';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as apigatewayv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import { WebSocketLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
@@ -20,11 +21,17 @@ export class HermesWebSocketStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: HermesWebSocketStackProps) {
     super(scope, id, props);
 
+    const connectLogGroup = new logs.LogGroup(this, 'WsConnectHandlerLogGroup', {
+      logGroupName: '/aws/lambda/hermes-ws-connect',
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     const connectHandler = new lambda.Function(this, 'WsConnectHandler', {
       functionName: 'hermes-ws-connect',
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../lambda/ws-connect')),
+      logGroup: connectLogGroup,
       environment: {
         WS_CONNECTIONS_TABLE: props.wsConnectionsTable.tableName,
       },
@@ -32,11 +39,17 @@ export class HermesWebSocketStack extends cdk.Stack {
     cdk.Tags.of(connectHandler).add(HERMES_TAG.key, HERMES_TAG.value);
     props.wsConnectionsTable.grantWriteData(connectHandler);
 
+    const disconnectLogGroup = new logs.LogGroup(this, 'WsDisconnectHandlerLogGroup', {
+      logGroupName: '/aws/lambda/hermes-ws-disconnect',
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     const disconnectHandler = new lambda.Function(this, 'WsDisconnectHandler', {
       functionName: 'hermes-ws-disconnect',
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../lambda/ws-disconnect')),
+      logGroup: disconnectLogGroup,
       environment: {
         WS_CONNECTIONS_TABLE: props.wsConnectionsTable.tableName,
       },

@@ -63,6 +63,7 @@ export class HermesAppStack extends cdk.Stack {
         excludePunctuation: true,
         passwordLength: 16,
       },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
     cdk.Tags.of(adminSecret).add(HERMES_TAG.key, HERMES_TAG.value);
 

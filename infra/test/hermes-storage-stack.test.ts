@@ -2,6 +2,10 @@ import * as cdk from 'aws-cdk-lib/core';
 import { Template, Match } from 'aws-cdk-lib/assertions';
 import { HermesStorageStack } from '../lib/hermes-storage-stack';
 
+function resourcesOfType(template: Template, type: string): any[] {
+  return Object.values(template.toJSON().Resources).filter((r: any) => r.Type === type);
+}
+
 describe('HermesStorageStack', () => {
   let template: Template;
 
@@ -208,6 +212,24 @@ describe('HermesStorageStack', () => {
       template.hasResourceProperties('AWS::DynamoDB::Table', {
         TableName: 'hermes-ws-connections',
         Tags: Match.arrayWith([{ Key: 'Project', Value: 'hermes' }]),
+      });
+    });
+  });
+
+  describe('Removal policies', () => {
+    test('all DynamoDB tables have DeletionPolicy Delete', () => {
+      const tables = resourcesOfType(template, 'AWS::DynamoDB::Table');
+      expect(tables.length).toBeGreaterThan(0);
+      tables.forEach((t: any) => {
+        expect(t.DeletionPolicy).toBe('Delete');
+      });
+    });
+
+    test('S3 bucket has DeletionPolicy Delete', () => {
+      const buckets = resourcesOfType(template, 'AWS::S3::Bucket');
+      expect(buckets.length).toBeGreaterThan(0);
+      buckets.forEach((b: any) => {
+        expect(b.DeletionPolicy).toBe('Delete');
       });
     });
   });
