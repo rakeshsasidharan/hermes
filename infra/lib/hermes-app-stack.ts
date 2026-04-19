@@ -60,8 +60,8 @@ export class HermesAppStack extends cdk.Stack {
       generateSecretString: {
         secretStringTemplate: JSON.stringify({ username: 'admin' }),
         generateStringKey: 'password',
-        excludePunctuation: true,
         passwordLength: 16,
+        requireEachIncludedType: true,
       },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
