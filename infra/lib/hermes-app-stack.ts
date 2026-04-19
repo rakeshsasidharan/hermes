@@ -1,5 +1,6 @@
 import * as path from 'path';
 import * as cdk from 'aws-cdk-lib/core';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
@@ -9,6 +10,8 @@ import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as eventTargets from 'aws-cdk-lib/aws-events-targets';
+import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import { Platform } from 'aws-cdk-lib/aws-ecr-assets';
@@ -24,6 +27,12 @@ export interface HermesAppStackProps extends cdk.StackProps {
   wsConnectionsTable: dynamodb.ITable;
   sesRuleSetName: string;
   websocketEndpoint: string;
+  /** Custom domain to serve the app from (e.g. hermes.rpillai.dev). Requires certificate + hostedZoneDomainName. */
+  domainName?: string;
+  /** ACM certificate for domainName — must be in us-east-1. */
+  certificate?: acm.ICertificate;
+  /** Route 53 hosted zone domain (e.g. rpillai.dev) for creating the A record alias. */
+  hostedZoneDomainName?: string;
 }
 
 export class HermesAppStack extends cdk.Stack {
@@ -181,13 +190,33 @@ export class HermesAppStack extends cdk.Stack {
         allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
       },
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
+      ...(props.domainName && props.certificate ? {
+        domainNames: [props.domainName],
+        certificate: props.certificate,
+      } : {}),
     });
     cdk.Tags.of(distribution).add(HERMES_TAG.key, HERMES_TAG.value);
 
+    // ── Route 53 alias record ───────────────────────────────────────────────
+    if (props.domainName && props.hostedZoneDomainName) {
+      const hostedZone = route53.HostedZone.fromLookup(this, 'HostedZone', {
+        domainName: props.hostedZoneDomainName,
+      });
+      new route53.ARecord(this, 'AppARecord', {
+        zone: hostedZone,
+        recordName: props.domainName,
+        target: route53.RecordTarget.fromAlias(
+          new route53Targets.CloudFrontTarget(distribution),
+        ),
+      });
+    }
+
     new cdk.CfnOutput(this, 'AppUrlOutput', {
       exportName: 'HermesAppUrl',
-      value: `https://${distribution.distributionDomainName}`,
-      description: 'Hermes app URL (CloudFront)',
+      value: props.domainName
+        ? `https://${props.domainName}`
+        : `https://${distribution.distributionDomainName}`,
+      description: 'Hermes app URL',
     });
 
     // ── EventBridge warmer ─────────────────────────────────────────────────
