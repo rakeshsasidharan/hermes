@@ -37,10 +37,11 @@ describe('HermesEmailStack', () => {
       });
     });
 
-    test('sets hermes-receipt-rules as the active rule set', () => {
+    test('activates hermes-receipt-rules via AwsCustomResource', () => {
       template.resourceCountIs('AWS::SES::ReceiptRuleSet', 1);
-      template.hasResourceProperties('AWS::SES::ReceiptActiveRuleSet', {
-        RuleSetName: 'hermes-receipt-rules',
+      template.hasResourceProperties('Custom::AWS', {
+        Create: Match.stringLikeRegexp('setActiveReceiptRuleSet'),
+        Delete: Match.stringLikeRegexp('setActiveReceiptRuleSet'),
       });
     });
 

@@ -7,6 +7,7 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as eventTargets from 'aws-cdk-lib/aws-events-targets';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as cr from 'aws-cdk-lib/custom-resources';
 import * as path from 'path';
 import { Construct } from 'constructs';
 
@@ -32,11 +33,22 @@ export class HermesEmailStack extends cdk.Stack {
       ruleSetName: 'hermes-receipt-rules',
     });
 
-    new cdk.CfnResource(this, 'ActiveReceiptRuleSet', {
-      type: 'AWS::SES::ReceiptActiveRuleSet',
-      properties: {
-        RuleSetName: this.receiptRuleSet.ruleSetName!,
+    new cr.AwsCustomResource(this, 'ActiveReceiptRuleSet', {
+      onCreate: {
+        service: 'SES',
+        action: 'setActiveReceiptRuleSet',
+        parameters: { RuleSetName: this.receiptRuleSet.ruleSetName },
+        physicalResourceId: cr.PhysicalResourceId.of('ActiveReceiptRuleSet'),
       },
+      onDelete: {
+        service: 'SES',
+        action: 'setActiveReceiptRuleSet',
+        parameters: {},
+        physicalResourceId: cr.PhysicalResourceId.of('ActiveReceiptRuleSet'),
+      },
+      policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
+        resources: cr.AwsCustomResourcePolicy.ANY_RESOURCE,
+      }),
     });
 
     cdk.Tags.of(this.receiptRuleSet).add(HERMES_TAG.key, HERMES_TAG.value);
