@@ -7,6 +7,8 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as eventTargets from 'aws-cdk-lib/aws-events-targets';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import { Platform } from 'aws-cdk-lib/aws-ecr-assets';
@@ -187,5 +189,16 @@ export class HermesAppStack extends cdk.Stack {
       value: `https://${distribution.distributionDomainName}`,
       description: 'Hermes app URL (CloudFront)',
     });
+
+    // ── EventBridge warmer ─────────────────────────────────────────────────
+    // Pings the Lambda every 5 minutes to prevent cold starts.
+    const warmerRule = new events.Rule(this, 'WarmingRule', {
+      ruleName: 'hermes-app-warmer',
+      schedule: events.Schedule.rate(cdk.Duration.minutes(5)),
+    });
+    warmerRule.addTarget(new eventTargets.LambdaFunction(appFunction, {
+      event: events.RuleTargetInput.fromObject({ source: 'hermes-warmer' }),
+    }));
+    cdk.Tags.of(warmerRule).add(HERMES_TAG.key, HERMES_TAG.value);
   }
 }
