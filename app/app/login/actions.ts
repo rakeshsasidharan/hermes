@@ -1,12 +1,12 @@
 'use server';
 
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
 import { signIn, CognitoAuthError } from '@/lib/auth/cognito';
 import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from '@/lib/auth/cookies';
 
 export interface LoginState {
   error?: string;
+  success?: boolean;
 }
 
 export async function loginAction(
@@ -48,5 +48,5 @@ export async function loginAction(
     return { error: 'An unexpected error occurred. Please try again.' };
   }
 
-  redirect('/');
+  return { success: true };
 }

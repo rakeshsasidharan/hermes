@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { loginAction, type LoginState } from './actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +11,14 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 const initialState: LoginState = {};
 
 export function LoginForm() {
+  const router = useRouter();
   const [state, formAction, isPending] = useActionState(loginAction, initialState);
+
+  useEffect(() => {
+    if (state.success) {
+      router.push('/');
+    }
+  }, [state.success, router]);
 
   return (
     <form action={formAction} className="space-y-4">
