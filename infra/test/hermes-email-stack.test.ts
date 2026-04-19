@@ -37,10 +37,11 @@ describe('HermesEmailStack', () => {
       });
     });
 
-    test('sets hermes-receipt-rules as the active rule set', () => {
+    test('activates hermes-receipt-rules via AwsCustomResource', () => {
       template.resourceCountIs('AWS::SES::ReceiptRuleSet', 1);
-      template.hasResourceProperties('AWS::SES::ReceiptActiveRuleSet', {
-        RuleSetName: 'hermes-receipt-rules',
+      template.hasResourceProperties('Custom::AWS', {
+        Create: Match.stringLikeRegexp('setActiveReceiptRuleSet'),
+        Delete: Match.stringLikeRegexp('setActiveReceiptRuleSet'),
       });
     });
 
@@ -149,6 +150,23 @@ describe('HermesEmailStack', () => {
             object: { key: [{ prefix: 'inbound/' }] },
           },
         }),
+      });
+    });
+  });
+
+  describe('CloudWatch Log Groups', () => {
+    test('all log groups have DeletionPolicy Delete', () => {
+      const resources = template.toJSON().Resources;
+      const logGroups = Object.values(resources).filter((r: any) => r.Type === 'AWS::Logs::LogGroup');
+      expect(logGroups.length).toBeGreaterThan(0);
+      logGroups.forEach((lg: any) => {
+        expect(lg.DeletionPolicy).toBe('Delete');
+      });
+    });
+
+    test('creates explicit log group for hermes-inbound-email-processor', () => {
+      template.hasResourceProperties('AWS::Logs::LogGroup', {
+        LogGroupName: '/aws/lambda/hermes-inbound-email-processor',
       });
     });
   });

@@ -108,4 +108,27 @@ describe('HermesWebSocketStack', () => {
       });
     });
   });
+
+  describe('CloudWatch Log Groups', () => {
+    test('all log groups have DeletionPolicy Delete', () => {
+      const resources = template.toJSON().Resources;
+      const logGroups = Object.values(resources).filter((r: any) => r.Type === 'AWS::Logs::LogGroup');
+      expect(logGroups.length).toBeGreaterThan(0);
+      logGroups.forEach((lg: any) => {
+        expect(lg.DeletionPolicy).toBe('Delete');
+      });
+    });
+
+    test('creates explicit log group for hermes-ws-connect', () => {
+      template.hasResourceProperties('AWS::Logs::LogGroup', {
+        LogGroupName: '/aws/lambda/hermes-ws-connect',
+      });
+    });
+
+    test('creates explicit log group for hermes-ws-disconnect', () => {
+      template.hasResourceProperties('AWS::Logs::LogGroup', {
+        LogGroupName: '/aws/lambda/hermes-ws-disconnect',
+      });
+    });
+  });
 });

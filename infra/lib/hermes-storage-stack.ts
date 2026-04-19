@@ -29,7 +29,8 @@ export class HermesStorageStack extends cdk.Stack {
           enabled: true,
         },
       ],
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      autoDeleteObjects: true,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
     cdk.Tags.of(this.emailBucket).add(HERMES_TAG.key, HERMES_TAG.value);
 
@@ -37,7 +38,7 @@ export class HermesStorageStack extends cdk.Stack {
       tableName: 'hermes-addresses',
       partitionKey: { name: 'email', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
     cdk.Tags.of(this.addressesTable).add(HERMES_TAG.key, HERMES_TAG.value);
 
@@ -45,7 +46,7 @@ export class HermesStorageStack extends cdk.Stack {
       tableName: 'hermes-messages',
       partitionKey: { name: 'messageId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
     this.messagesTable.addGlobalSecondaryIndex({
       indexName: 'address-receivedAt-index',
@@ -58,7 +59,7 @@ export class HermesStorageStack extends cdk.Stack {
       tableName: 'hermes-drafts',
       partitionKey: { name: 'draftId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
     cdk.Tags.of(this.draftsTable).add(HERMES_TAG.key, HERMES_TAG.value);
 
@@ -67,7 +68,7 @@ export class HermesStorageStack extends cdk.Stack {
       partitionKey: { name: 'connectionId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       timeToLiveAttribute: 'ttl',
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
     cdk.Tags.of(this.wsConnectionsTable).add(HERMES_TAG.key, HERMES_TAG.value);
   }

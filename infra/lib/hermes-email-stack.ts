@@ -2,10 +2,12 @@ import * as cdk from 'aws-cdk-lib/core';
 import * as ses from 'aws-cdk-lib/aws-ses';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as eventTargets from 'aws-cdk-lib/aws-events-targets';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as cr from 'aws-cdk-lib/custom-resources';
 import * as path from 'path';
 import { Construct } from 'constructs';
 
@@ -31,11 +33,22 @@ export class HermesEmailStack extends cdk.Stack {
       ruleSetName: 'hermes-receipt-rules',
     });
 
-    new cdk.CfnResource(this, 'ActiveReceiptRuleSet', {
-      type: 'AWS::SES::ReceiptActiveRuleSet',
-      properties: {
-        RuleSetName: this.receiptRuleSet.ruleSetName!,
+    new cr.AwsCustomResource(this, 'ActiveReceiptRuleSet', {
+      onCreate: {
+        service: 'SES',
+        action: 'setActiveReceiptRuleSet',
+        parameters: { RuleSetName: this.receiptRuleSet.ruleSetName },
+        physicalResourceId: cr.PhysicalResourceId.of('ActiveReceiptRuleSet'),
       },
+      onDelete: {
+        service: 'SES',
+        action: 'setActiveReceiptRuleSet',
+        parameters: {},
+        physicalResourceId: cr.PhysicalResourceId.of('ActiveReceiptRuleSet'),
+      },
+      policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
+        resources: cr.AwsCustomResourcePolicy.ANY_RESOURCE,
+      }),
     });
 
     cdk.Tags.of(this.receiptRuleSet).add(HERMES_TAG.key, HERMES_TAG.value);
@@ -54,11 +67,17 @@ export class HermesEmailStack extends cdk.Stack {
 
     cdk.Tags.of(this.sesS3DeliveryRole).add(HERMES_TAG.key, HERMES_TAG.value);
 
+    const processorLogGroup = new logs.LogGroup(this, 'InboundEmailProcessorLogGroup', {
+      logGroupName: '/aws/lambda/hermes-inbound-email-processor',
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     this.inboundEmailProcessor = new lambda.Function(this, 'InboundEmailProcessor', {
       functionName: 'hermes-inbound-email-processor',
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../lambda/inbound-email-processor')),
+      logGroup: processorLogGroup,
       environment: {
         MESSAGES_TABLE: props.messagesTable.tableName,
         WS_CONNECTIONS_TABLE: props.wsConnectionsTable.tableName,

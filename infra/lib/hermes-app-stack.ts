@@ -6,7 +6,7 @@ import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as apprunner from 'aws-cdk-lib/aws-apprunner';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
-import { DockerImageAsset } from 'aws-cdk-lib/aws-ecr-assets';
+import { DockerImageAsset, Platform } from 'aws-cdk-lib/aws-ecr-assets';
 import { Construct } from 'constructs';
 
 const HERMES_TAG = { key: 'Project', value: 'hermes' };
@@ -60,9 +60,10 @@ export class HermesAppStack extends cdk.Stack {
       generateSecretString: {
         secretStringTemplate: JSON.stringify({ username: 'admin' }),
         generateStringKey: 'password',
-        excludePunctuation: true,
         passwordLength: 16,
+        requireEachIncludedType: true,
       },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
     cdk.Tags.of(adminSecret).add(HERMES_TAG.key, HERMES_TAG.value);
 
@@ -96,6 +97,7 @@ export class HermesAppStack extends cdk.Stack {
 
     const appImage = new DockerImageAsset(this, 'AppImage', {
       directory: path.join(__dirname, '../../app'),
+      platform: Platform.LINUX_AMD64,
     });
 
     // ── App Runner (#13) ────────────────────────────────────────────────────
@@ -167,6 +169,7 @@ export class HermesAppStack extends cdk.Stack {
           imageConfiguration: {
             port: '3000',
             runtimeEnvironmentVariables: [
+              { name: 'HOSTNAME', value: '0.0.0.0' },
               { name: 'ADDRESSES_TABLE', value: props.addressesTable.tableName },
               { name: 'MESSAGES_TABLE', value: props.messagesTable.tableName },
               { name: 'DRAFTS_TABLE', value: props.draftsTable.tableName },
