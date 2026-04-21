@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib/core';
 import { Template, Match } from 'aws-cdk-lib/assertions';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
+import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import { HermesAppStack } from '../lib/hermes-app-stack';
@@ -12,72 +13,41 @@ const MOCK_DRAFTS_ARN = 'arn:aws:dynamodb:us-east-1:123456789012:table/hermes-dr
 const MOCK_WS_ARN = 'arn:aws:dynamodb:us-east-1:123456789012:table/hermes-ws-connections';
 const MOCK_WS_ENDPOINT = 'wss://abc123.execute-api.us-east-1.amazonaws.com/prod';
 
+function buildStack(app: cdk.App, stackId = 'TestHermesAppStack') {
+  const helperStack = new cdk.Stack(app, 'HelperStack');
+  const authStack = new cdk.Stack(app, 'AuthStack');
+
+  const emailBucket = s3.Bucket.fromBucketArn(helperStack, 'MockBucket', MOCK_BUCKET_ARN);
+  const addressesTable = dynamodb.Table.fromTableArn(helperStack, 'MockAddresses', MOCK_ADDRESSES_ARN);
+  const messagesTable = dynamodb.Table.fromTableArn(helperStack, 'MockMessages', MOCK_MESSAGES_ARN);
+  const draftsTable = dynamodb.Table.fromTableArn(helperStack, 'MockDrafts', MOCK_DRAFTS_ARN);
+  const wsTable = dynamodb.Table.fromTableArn(helperStack, 'MockWs', MOCK_WS_ARN);
+
+  const userPool = new cognito.CfnUserPool(authStack, 'UserPool', { userPoolName: 'hermes-user-pool' });
+  const userPoolClient = new cognito.CfnUserPoolClient(authStack, 'UserPoolClient', {
+    userPoolId: userPool.ref,
+    clientName: 'hermes-app-client',
+  });
+
+  return new HermesAppStack(app, stackId, {
+    emailBucket,
+    addressesTable,
+    messagesTable,
+    draftsTable,
+    wsConnectionsTable: wsTable,
+    sesRuleSetName: 'hermes-receipt-rules',
+    websocketEndpoint: MOCK_WS_ENDPOINT,
+    userPool,
+    userPoolClient,
+  });
+}
+
 describe('HermesAppStack', () => {
   let template: Template;
 
   beforeEach(() => {
     const app = new cdk.App();
-    const helperStack = new cdk.Stack(app, 'HelperStack');
-    const emailBucket = s3.Bucket.fromBucketArn(helperStack, 'MockBucket', MOCK_BUCKET_ARN);
-    const addressesTable = dynamodb.Table.fromTableArn(helperStack, 'MockAddresses', MOCK_ADDRESSES_ARN);
-    const messagesTable = dynamodb.Table.fromTableArn(helperStack, 'MockMessages', MOCK_MESSAGES_ARN);
-    const draftsTable = dynamodb.Table.fromTableArn(helperStack, 'MockDrafts', MOCK_DRAFTS_ARN);
-    const wsTable = dynamodb.Table.fromTableArn(helperStack, 'MockWs', MOCK_WS_ARN);
-
-    const stack = new HermesAppStack(app, 'TestHermesAppStack', {
-      emailBucket,
-      addressesTable,
-      messagesTable,
-      draftsTable,
-      wsConnectionsTable: wsTable,
-      sesRuleSetName: 'hermes-receipt-rules',
-      websocketEndpoint: MOCK_WS_ENDPOINT,
-    });
-    template = Template.fromStack(stack);
-  });
-
-  describe('Cognito User Pool', () => {
-    test('creates User Pool named hermes-user-pool', () => {
-      template.hasResourceProperties('AWS::Cognito::UserPool', {
-        UserPoolName: 'hermes-user-pool',
-      });
-    });
-
-    test('self-sign-up is disabled', () => {
-      template.hasResourceProperties('AWS::Cognito::UserPool', {
-        AdminCreateUserConfig: { AllowAdminCreateUserOnly: true },
-      });
-    });
-
-    test('creates App Client with USER_PASSWORD_AUTH and REFRESH_TOKEN_AUTH', () => {
-      template.hasResourceProperties('AWS::Cognito::UserPoolClient', {
-        ClientName: 'hermes-app-client',
-        ExplicitAuthFlows: Match.arrayWith([
-          'ALLOW_USER_PASSWORD_AUTH',
-          'ALLOW_REFRESH_TOKEN_AUTH',
-        ]),
-      });
-    });
-
-    test('creates admin user', () => {
-      template.hasResourceProperties('AWS::Cognito::UserPoolUser', {
-        Username: 'admin',
-      });
-    });
-
-    test('creates Secrets Manager secret for admin credentials', () => {
-      template.hasResourceProperties('AWS::SecretsManager::Secret', {
-        Name: 'hermes-admin-credentials',
-      });
-    });
-
-    test('outputs User Pool ID', () => {
-      template.hasOutput('UserPoolIdOutput', { Export: { Name: 'HermesUserPoolId' } });
-    });
-
-    test('outputs App Client ID', () => {
-      template.hasOutput('UserPoolClientIdOutput', { Export: { Name: 'HermesUserPoolClientId' } });
-    });
+    template = Template.fromStack(buildStack(app));
   });
 
   describe('Lambda function (Next.js + Lambda Web Adapter)', () => {
@@ -206,16 +176,6 @@ describe('HermesAppStack', () => {
     });
   });
 
-  describe('Removal policies', () => {
-    test('admin secret has DeletionPolicy Delete', () => {
-      const resources = template.toJSON().Resources;
-      const secrets = Object.values(resources).filter(
-        (r: any) => r.Type === 'AWS::SecretsManager::Secret',
-      );
-      secrets.forEach((s: any) => expect(s.DeletionPolicy).toBe('Delete'));
-    });
-  });
-
   describe('Custom domain', () => {
     const MOCK_HOSTED_ZONE_CONTEXT = {
       'hosted-zone:account=123456789012:domainName=rpillai.dev:region=us-east-1': {
@@ -231,6 +191,10 @@ describe('HermesAppStack', () => {
       const helperStack = new cdk.Stack(app, 'HelperStack', {
         env: { account: '123456789012', region: 'us-east-1' },
       });
+      const authStack = new cdk.Stack(app, 'AuthStack', {
+        env: { account: '123456789012', region: 'us-east-1' },
+      });
+
       const emailBucket = s3.Bucket.fromBucketArn(helperStack, 'MockBucket', MOCK_BUCKET_ARN);
       const addressesTable = dynamodb.Table.fromTableArn(helperStack, 'MockAddresses', MOCK_ADDRESSES_ARN);
       const messagesTable = dynamodb.Table.fromTableArn(helperStack, 'MockMessages', MOCK_MESSAGES_ARN);
@@ -241,6 +205,11 @@ describe('HermesAppStack', () => {
         'MockCert',
         'arn:aws:acm:us-east-1:123456789012:certificate/mock-cert-id',
       );
+      const userPool = new cognito.CfnUserPool(authStack, 'UserPool', { userPoolName: 'hermes-user-pool' });
+      const userPoolClient = new cognito.CfnUserPoolClient(authStack, 'UserPoolClient', {
+        userPoolId: userPool.ref,
+        clientName: 'hermes-app-client',
+      });
 
       const stack = new HermesAppStack(app, 'TestHermesAppStackDomain', {
         env: { account: '123456789012', region: 'us-east-1' },
@@ -251,6 +220,8 @@ describe('HermesAppStack', () => {
         wsConnectionsTable: wsTable,
         sesRuleSetName: 'hermes-receipt-rules',
         websocketEndpoint: MOCK_WS_ENDPOINT,
+        userPool,
+        userPoolClient,
         domainName: 'hermes.rpillai.dev',
         certificate: mockCert,
         hostedZoneDomainName: 'rpillai.dev',
