@@ -11,10 +11,16 @@
     "cdk": "cdk"
   },
   "devDependencies": {
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.0.0",
+    "@aws-sdk/client-dynamodb": "^3.0.0",
+    "@aws-sdk/client-s3": "^3.0.0",
+    "@aws-sdk/lib-dynamodb": "^3.0.0",
     "@types/jest": "^30.0.0",
+    "@types/mailparser": "^3.4.4",
     "@types/node": "^24.10.1",
     "aws-cdk": "2.1118.0",
     "jest": "^30",
+    "mailparser": "^3.7.2",
     "ts-jest": "^29",
     "ts-node": "^10.9.2",
     "typescript": "~5.9.3"

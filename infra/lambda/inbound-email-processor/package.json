@@ -1,0 +1,13 @@
+{
+  "name": "inbound-email-processor",
+  "version": "1.0.0",
+  "description": "Hermes inbound email processor Lambda",
+  "main": "index.js",
+  "dependencies": {
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.0.0",
+    "@aws-sdk/client-dynamodb": "^3.0.0",
+    "@aws-sdk/client-s3": "^3.0.0",
+    "@aws-sdk/lib-dynamodb": "^3.0.0",
+    "mailparser": "^3.7.2"
+  }
+}
