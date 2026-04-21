@@ -3,7 +3,6 @@ import * as cdk from 'aws-cdk-lib/core';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as iam from 'aws-cdk-lib/aws-iam';
-import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
@@ -27,6 +26,8 @@ export interface HermesAppStackProps extends cdk.StackProps {
   wsConnectionsTable: dynamodb.ITable;
   sesRuleSetName: string;
   websocketEndpoint: string;
+  userPool: cognito.CfnUserPool;
+  userPoolClient: cognito.CfnUserPoolClient;
   /** Custom domain to serve the app from (e.g. hermes.rpillai.dev). Requires certificate + hostedZoneDomainName. */
   domainName?: string;
   /** ACM certificate for domainName — must be in us-east-1. */
@@ -36,74 +37,8 @@ export interface HermesAppStackProps extends cdk.StackProps {
 }
 
 export class HermesAppStack extends cdk.Stack {
-  public readonly userPool: cognito.CfnUserPool;
-  public readonly userPoolClient: cognito.CfnUserPoolClient;
-
   constructor(scope: Construct, id: string, props: HermesAppStackProps) {
     super(scope, id, props);
-
-    // ── Cognito User Pool ───────────────────────────────────────────────────
-
-    this.userPool = new cognito.CfnUserPool(this, 'UserPool', {
-      userPoolName: 'hermes-user-pool',
-      adminCreateUserConfig: {
-        allowAdminCreateUserOnly: true,
-      },
-      policies: {
-        passwordPolicy: {
-          minimumLength: 12,
-          requireUppercase: true,
-          requireLowercase: true,
-          requireNumbers: true,
-          requireSymbols: true,
-        },
-      },
-      autoVerifiedAttributes: ['email'],
-    });
-    cdk.Tags.of(this.userPool).add(HERMES_TAG.key, HERMES_TAG.value);
-
-    this.userPoolClient = new cognito.CfnUserPoolClient(this, 'UserPoolClient', {
-      clientName: 'hermes-app-client',
-      userPoolId: this.userPool.ref,
-      explicitAuthFlows: ['ALLOW_USER_PASSWORD_AUTH', 'ALLOW_REFRESH_TOKEN_AUTH'],
-      generateSecret: false,
-    });
-
-    const adminSecret = new secretsmanager.Secret(this, 'AdminSecret', {
-      secretName: 'hermes-admin-credentials',
-      generateSecretString: {
-        secretStringTemplate: JSON.stringify({ username: 'admin' }),
-        generateStringKey: 'password',
-        passwordLength: 16,
-        requireEachIncludedType: true,
-      },
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-    });
-    cdk.Tags.of(adminSecret).add(HERMES_TAG.key, HERMES_TAG.value);
-
-    // Admin user is created in FORCE_CHANGE_PASSWORD state.
-    // Set the initial password with:
-    //   aws cognito-idp admin-set-user-password \
-    //     --user-pool-id <pool-id> \
-    //     --username admin \
-    //     --password $(aws secretsmanager get-secret-value --secret-id hermes-admin-credentials --query SecretString --output text | jq -r .password) \
-    //     --permanent
-    new cognito.CfnUserPoolUser(this, 'AdminUser', {
-      userPoolId: this.userPool.ref,
-      username: 'admin',
-    });
-
-    new cdk.CfnOutput(this, 'UserPoolIdOutput', {
-      exportName: 'HermesUserPoolId',
-      value: this.userPool.ref,
-      description: 'Hermes Cognito User Pool ID',
-    });
-
-    new cdk.CfnOutput(this, 'UserPoolClientIdOutput', {
-      exportName: 'HermesUserPoolClientId',
-      value: this.userPoolClient.ref,
-      description: 'Hermes Cognito App Client ID',
-    });
 
     // ── Lambda execution role ───────────────────────────────────────────────
 
@@ -140,7 +75,7 @@ export class HermesAppStack extends cdk.Stack {
     executionRole.addToPolicy(new iam.PolicyStatement({
       sid: 'CognitoPermissions',
       actions: ['cognito-idp:GetUser'],
-      resources: [this.userPool.attrArn],
+      resources: [props.userPool.attrArn],
     }));
 
     // ── Lambda function (Next.js container + Lambda Web Adapter) ───────────
@@ -168,8 +103,8 @@ export class HermesAppStack extends cdk.Stack {
         WS_CONNECTIONS_TABLE: props.wsConnectionsTable.tableName,
         S3_BUCKET: props.emailBucket.bucketName,
         SES_RULE_SET_NAME: props.sesRuleSetName,
-        COGNITO_USER_POOL_ID: this.userPool.ref,
-        COGNITO_CLIENT_ID: this.userPoolClient.ref,
+        COGNITO_USER_POOL_ID: props.userPool.ref,
+        COGNITO_CLIENT_ID: props.userPoolClient.ref,
         WEBSOCKET_ENDPOINT: props.websocketEndpoint,
       },
     });

@@ -11,6 +11,7 @@ const HERMES_TAG = { key: 'Project', value: 'hermes' };
 
 export interface HermesWebSocketStackProps extends cdk.StackProps {
   wsConnectionsTable: dynamodb.ITable;
+  userPoolId: string;
 }
 
 export class HermesWebSocketStack extends cdk.Stack {
@@ -34,6 +35,7 @@ export class HermesWebSocketStack extends cdk.Stack {
       logGroup: connectLogGroup,
       environment: {
         WS_CONNECTIONS_TABLE: props.wsConnectionsTable.tableName,
+        COGNITO_USER_POOL_ID: props.userPoolId,
       },
     });
     cdk.Tags.of(connectHandler).add(HERMES_TAG.key, HERMES_TAG.value);

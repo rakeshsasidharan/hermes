@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib/core';
+import { HermesAuthStack } from '../lib/hermes-auth-stack';
 import { HermesStorageStack } from '../lib/hermes-storage-stack';
 import { HermesEmailStack } from '../lib/hermes-email-stack';
 import { HermesWebSocketStack } from '../lib/hermes-websocket-stack';
@@ -16,11 +17,14 @@ const env = {
 const DOMAIN_NAME = 'hermes.rpillai.dev';
 const HOSTED_ZONE_DOMAIN = 'rpillai.dev';
 
+const authStack = new HermesAuthStack(app, 'HermesAuthStack', { env });
+
 const storageStack = new HermesStorageStack(app, 'HermesStorageStack', { env });
 
 const webSocketStack = new HermesWebSocketStack(app, 'HermesWebSocketStack', {
   env,
   wsConnectionsTable: storageStack.wsConnectionsTable,
+  userPoolId: authStack.userPool.ref,
 });
 
 new HermesEmailStack(app, 'HermesEmailStack', {
@@ -50,6 +54,8 @@ new HermesAppStack(app, 'HermesAppStack', {
   wsConnectionsTable: storageStack.wsConnectionsTable,
   sesRuleSetName: 'hermes-receipt-rules',
   websocketEndpoint: webSocketStack.webSocketEndpoint,
+  userPool: authStack.userPool,
+  userPoolClient: authStack.userPoolClient,
   domainName: DOMAIN_NAME,
   certificate: certStack.certificate,
   hostedZoneDomainName: HOSTED_ZONE_DOMAIN,

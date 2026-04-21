@@ -16,6 +16,7 @@ describe('HermesWebSocketStack', () => {
     );
     const stack = new HermesWebSocketStack(app, 'TestHermesWebSocketStack', {
       wsConnectionsTable: wsTable,
+      userPoolId: 'us-east-1_testPool',
     });
     template = Template.fromStack(stack);
   });
@@ -63,12 +64,13 @@ describe('HermesWebSocketStack', () => {
       });
     });
 
-    test('WsConnectHandler has WS_CONNECTIONS_TABLE env var', () => {
+    test('WsConnectHandler has WS_CONNECTIONS_TABLE and COGNITO_USER_POOL_ID env vars', () => {
       template.hasResourceProperties('AWS::Lambda::Function', {
         FunctionName: 'hermes-ws-connect',
         Environment: {
           Variables: Match.objectLike({
             WS_CONNECTIONS_TABLE: 'hermes-ws-connections',
+            COGNITO_USER_POOL_ID: 'us-east-1_testPool',
           }),
         },
       });

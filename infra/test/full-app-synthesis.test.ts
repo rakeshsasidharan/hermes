@@ -1,5 +1,6 @@
 import * as cdk from 'aws-cdk-lib/core';
 import { Template } from 'aws-cdk-lib/assertions';
+import { HermesAuthStack } from '../lib/hermes-auth-stack';
 import { HermesStorageStack } from '../lib/hermes-storage-stack';
 import { HermesEmailStack } from '../lib/hermes-email-stack';
 import { HermesWebSocketStack } from '../lib/hermes-websocket-stack';
@@ -16,11 +17,14 @@ function buildApp() {
   const app = new cdk.App();
   const env = { account: '123456789012', region: 'us-east-1' };
 
+  const authStack = new HermesAuthStack(app, 'HermesAuthStack', { env });
+
   const storageStack = new HermesStorageStack(app, 'HermesStorageStack', { env });
 
   const webSocketStack = new HermesWebSocketStack(app, 'HermesWebSocketStack', {
     env,
     wsConnectionsTable: storageStack.wsConnectionsTable,
+    userPoolId: authStack.userPool.ref,
   });
 
   new HermesEmailStack(app, 'HermesEmailStack', {
@@ -41,6 +45,8 @@ function buildApp() {
     wsConnectionsTable: storageStack.wsConnectionsTable,
     sesRuleSetName: 'hermes-receipt-rules',
     websocketEndpoint: webSocketStack.webSocketEndpoint,
+    userPool: authStack.userPool,
+    userPoolClient: authStack.userPoolClient,
   });
 
   app.synth();
@@ -54,7 +60,7 @@ describe('Full CDK app synthesis (integration)', () => {
 
   test('no stateful resource has DeletionPolicy Retain across any stack', () => {
     const app = buildApp();
-    const stackIds = ['HermesStorageStack', 'HermesWebSocketStack', 'HermesEmailStack', 'HermesAppStack'];
+    const stackIds = ['HermesAuthStack', 'HermesStorageStack', 'HermesWebSocketStack', 'HermesEmailStack', 'HermesAppStack'];
 
     for (const stackId of stackIds) {
       const stack = app.node.findChild(stackId) as cdk.Stack;
