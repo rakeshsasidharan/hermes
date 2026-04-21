@@ -41,11 +41,11 @@ describe('HermesAuthStack', () => {
     });
 
     test('outputs User Pool ID', () => {
-      template.hasOutput('UserPoolIdOutput', { Export: { Name: 'HermesUserPoolId' } });
+      template.hasOutput('UserPoolIdOutput', { Export: { Name: 'HermesAuthUserPoolId' } });
     });
 
     test('outputs App Client ID', () => {
-      template.hasOutput('UserPoolClientIdOutput', { Export: { Name: 'HermesUserPoolClientId' } });
+      template.hasOutput('UserPoolClientIdOutput', { Export: { Name: 'HermesAuthUserPoolClientId' } });
     });
   });
 

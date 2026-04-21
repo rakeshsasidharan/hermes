@@ -62,13 +62,13 @@ export class HermesAuthStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'UserPoolIdOutput', {
-      exportName: 'HermesUserPoolId',
+      exportName: 'HermesAuthUserPoolId',
       value: this.userPool.ref,
       description: 'Hermes Cognito User Pool ID',
     });
 
     new cdk.CfnOutput(this, 'UserPoolClientIdOutput', {
-      exportName: 'HermesUserPoolClientId',
+      exportName: 'HermesAuthUserPoolClientId',
       value: this.userPoolClient.ref,
       description: 'Hermes Cognito App Client ID',
     });
