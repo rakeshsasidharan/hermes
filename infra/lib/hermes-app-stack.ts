@@ -26,6 +26,7 @@ export interface HermesAppStackProps extends cdk.StackProps {
   wsConnectionsTable: dynamodb.ITable;
   sesRuleSetName: string;
   websocketEndpoint: string;
+  inboundProcessorArn: string;
   userPool: cognito.CfnUserPool;
   userPoolClient: cognito.CfnUserPoolClient;
   /** Custom domain to serve the app from (e.g. hermes.rpillai.dev). Requires certificate + hostedZoneDomainName. */
@@ -106,6 +107,7 @@ export class HermesAppStack extends cdk.Stack {
         COGNITO_USER_POOL_ID: props.userPool.ref,
         COGNITO_CLIENT_ID: props.userPoolClient.ref,
         WEBSOCKET_ENDPOINT: props.websocketEndpoint,
+        INBOUND_PROCESSOR_ARN: props.inboundProcessorArn,
       },
     });
     cdk.Tags.of(appFunction).add(HERMES_TAG.key, HERMES_TAG.value);

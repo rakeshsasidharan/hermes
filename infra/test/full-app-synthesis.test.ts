@@ -27,7 +27,7 @@ function buildApp() {
     userPoolId: authStack.userPool.ref,
   });
 
-  new HermesEmailStack(app, 'HermesEmailStack', {
+  const emailStack = new HermesEmailStack(app, 'HermesEmailStack', {
     env,
     emailBucket: storageStack.emailBucket,
     messagesTable: storageStack.messagesTable,
@@ -45,6 +45,7 @@ function buildApp() {
     wsConnectionsTable: storageStack.wsConnectionsTable,
     sesRuleSetName: 'hermes-receipt-rules',
     websocketEndpoint: webSocketStack.webSocketEndpoint,
+    inboundProcessorArn: emailStack.inboundEmailProcessor.functionArn,
     userPool: authStack.userPool,
     userPoolClient: authStack.userPoolClient,
   });

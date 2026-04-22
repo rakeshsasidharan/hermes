@@ -37,6 +37,7 @@ function buildStack(app: cdk.App, stackId = 'TestHermesAppStack') {
     wsConnectionsTable: wsTable,
     sesRuleSetName: 'hermes-receipt-rules',
     websocketEndpoint: MOCK_WS_ENDPOINT,
+    inboundProcessorArn: 'arn:aws:lambda:us-east-1:123456789012:function:hermes-inbound-email-processor',
     userPool,
     userPoolClient,
   });
@@ -74,6 +75,7 @@ describe('HermesAppStack', () => {
             S3_BUCKET: 'hermes-email-store',
             SES_RULE_SET_NAME: 'hermes-receipt-rules',
             WEBSOCKET_ENDPOINT: MOCK_WS_ENDPOINT,
+            INBOUND_PROCESSOR_ARN: 'arn:aws:lambda:us-east-1:123456789012:function:hermes-inbound-email-processor',
           }),
         },
       });
@@ -220,6 +222,7 @@ describe('HermesAppStack', () => {
         wsConnectionsTable: wsTable,
         sesRuleSetName: 'hermes-receipt-rules',
         websocketEndpoint: MOCK_WS_ENDPOINT,
+        inboundProcessorArn: 'arn:aws:lambda:us-east-1:123456789012:function:hermes-inbound-email-processor',
         userPool,
         userPoolClient,
         domainName: 'hermes.rpillai.dev',
