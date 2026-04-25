@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { requireAuth, AuthError } from '@/lib/auth/require-auth';
@@ -47,19 +47,16 @@ export async function GET(
 
   const item = { ...result.Item };
 
-  // Replace bodyHtmlS3Key with a pre-signed bodyHtmlUrl
   if (item.bodyHtmlS3Key) {
     item.bodyHtmlUrl = await presign(item.bodyHtmlS3Key as string);
     delete item.bodyHtmlS3Key;
   }
 
-  // Replace bodyTextS3Key with a pre-signed bodyTextUrl
   if (item.bodyTextS3Key) {
     item.bodyTextUrl = await presign(item.bodyTextS3Key as string);
     delete item.bodyTextS3Key;
   }
 
-  // Augment each attachment with a pre-signed url (skip attachments without s3Key)
   if (Array.isArray(item.attachments)) {
     item.attachments = await Promise.all(
       (item.attachments as Array<Record<string, unknown>>).map(async (attachment) => {
@@ -73,4 +70,58 @@ export async function GET(
   }
 
   return NextResponse.json({ message: item });
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    await requireAuth(req);
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+
+  const { id } = await params;
+
+  let isRead: unknown;
+  try {
+    const body = await req.json();
+    isRead = body?.isRead;
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+  }
+
+  if (typeof isRead !== 'boolean') {
+    return NextResponse.json({ error: 'isRead must be a boolean' }, { status: 400 });
+  }
+
+  const dynamo = getDynamo();
+
+  const existing = await dynamo.send(new GetCommand({
+    TableName: process.env.MESSAGES_TABLE!,
+    Key: { messageId: id },
+  }));
+
+  if (!existing.Item) {
+    return NextResponse.json({ error: 'Message not found' }, { status: 404 });
+  }
+
+  const result = await dynamo.send(new UpdateCommand({
+    TableName: process.env.MESSAGES_TABLE!,
+    Key: { messageId: id },
+    UpdateExpression: 'SET isRead = :isRead, #status = :status, updatedAt = :now',
+    ExpressionAttributeNames: { '#status': 'status' },
+    ExpressionAttributeValues: {
+      ':isRead': isRead,
+      ':status': isRead ? 'read' : 'unread',
+      ':now': new Date().toISOString(),
+    },
+    ReturnValues: 'ALL_NEW',
+  }));
+
+  return NextResponse.json({ message: result.Attributes });
 }
