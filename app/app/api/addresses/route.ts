@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SESClient, ListIdentitiesCommand, CreateEmailIdentityCommand, CreateReceiptRuleCommand } from '@aws-sdk/client-ses';
+import { SESClient, ListIdentitiesCommand, CreateReceiptRuleCommand } from '@aws-sdk/client-ses';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, ScanCommand, PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { requireAuth, AuthError } from '@/lib/auth/require-auth';
@@ -70,9 +70,6 @@ export async function POST(req: NextRequest) {
   if (existing.Item && existing.Item.status !== 'deleted') {
     return NextResponse.json({ error: 'Address already exists' }, { status: 409 });
   }
-
-  // Create SES email identity
-  await ses.send(new CreateEmailIdentityCommand({ EmailIdentity: email }));
 
   // Create SES receipt rule
   const ruleName = `hermes-recv-${email.replace('@', '-at-').replace(/\./g, '-')}`;
