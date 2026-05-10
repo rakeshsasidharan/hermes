@@ -15,7 +15,11 @@ const mockSesSend = jest.fn();
 
 jest.mock('@aws-sdk/client-ses', () => ({
   SESClient: jest.fn().mockImplementation(() => ({ send: mockSesSend })),
-  ListIdentitiesCommand: jest.fn((p: unknown) => p),
+  ListIdentitiesCommand: jest.fn((p: unknown) => ({ _type: 'list', ...((p as object) ?? {}) })),
+  GetIdentityVerificationAttributesCommand: jest.fn((p: unknown) => ({
+    _type: 'verify-attrs',
+    ...((p as object) ?? {}),
+  })),
 }));
 
 import { requireAuth, AuthError } from '@/lib/auth/require-auth';
@@ -32,26 +36,54 @@ beforeEach(() => {
 });
 
 describe('GET /api/domains', () => {
-  test('returns verified domains for authenticated request', async () => {
+  test('returns domains with status for authenticated request', async () => {
     mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
-    mockSesSend.mockResolvedValue({ Identities: ['example.com', 'mail.example.com'] });
+    mockSesSend
+      .mockResolvedValueOnce({ Identities: ['example.com', 'mail.example.com'] })
+      .mockResolvedValueOnce({
+        VerificationAttributes: {
+          'example.com': { VerificationStatus: 'Success' },
+          'mail.example.com': { VerificationStatus: 'Pending' },
+        },
+      });
 
     const res = await GET(makeReq());
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body).toEqual({ domains: ['example.com', 'mail.example.com'] });
+    expect(body).toEqual({
+      domains: [
+        { domain: 'example.com', status: 'Verified' },
+        { domain: 'mail.example.com', status: 'Pending' },
+      ],
+    });
   });
 
-  test('returns empty list when no domains are verified', async () => {
+  test('returns empty list when no domains are registered', async () => {
     mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
-    mockSesSend.mockResolvedValue({ Identities: [] });
+    mockSesSend.mockResolvedValueOnce({ Identities: [] });
 
     const res = await GET(makeReq());
     const body = await res.json();
 
     expect(res.status).toBe(200);
     expect(body).toEqual({ domains: [] });
+  });
+
+  test('maps Failed SES status correctly', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+    mockSesSend
+      .mockResolvedValueOnce({ Identities: ['bad.example.com'] })
+      .mockResolvedValueOnce({
+        VerificationAttributes: {
+          'bad.example.com': { VerificationStatus: 'Failed' },
+        },
+      });
+
+    const res = await GET(makeReq());
+    const body = await res.json();
+
+    expect(body.domains[0].status).toBe('Failed');
   });
 
   test('returns 401 for unauthenticated request', async () => {
