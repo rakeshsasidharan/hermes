@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SESClient, ListIdentitiesCommand } from '@aws-sdk/client-ses';
+import {
+  SESClient,
+  ListIdentitiesCommand,
+  GetIdentityVerificationAttributesCommand,
+} from '@aws-sdk/client-ses';
 import { requireAuth, AuthError } from '@/lib/auth/require-auth';
 
 export async function GET(req: NextRequest) {
@@ -13,6 +17,26 @@ export async function GET(req: NextRequest) {
   }
 
   const ses = new SESClient({ region: process.env.AWS_REGION ?? 'us-east-1' });
-  const result = await ses.send(new ListIdentitiesCommand({ IdentityType: 'Domain' }));
-  return NextResponse.json({ domains: result.Identities ?? [] });
+  const listResult = await ses.send(new ListIdentitiesCommand({ IdentityType: 'Domain' }));
+  const identities = listResult.Identities ?? [];
+
+  if (identities.length === 0) {
+    return NextResponse.json({ domains: [] });
+  }
+
+  const attrsResult = await ses.send(
+    new GetIdentityVerificationAttributesCommand({ Identities: identities }),
+  );
+
+  const domains = identities.map((domain) => {
+    const raw =
+      attrsResult.VerificationAttributes?.[domain]?.VerificationStatus ?? 'Pending';
+    let status: 'Verified' | 'Pending' | 'Failed';
+    if (raw === 'Success') status = 'Verified';
+    else if (raw === 'Failed' || raw === 'TemporaryFailure') status = 'Failed';
+    else status = 'Pending';
+    return { domain, status };
+  });
+
+  return NextResponse.json({ domains });
 }

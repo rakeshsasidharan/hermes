@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -70,6 +71,16 @@ export function AddAddressDialog({ domains, onSuccess }: AddAddressDialogProps) 
         <DialogHeader>
           <DialogTitle>Add address</DialogTitle>
         </DialogHeader>
+        {domains.length === 0 && (
+          <Alert>
+            <AlertDescription>
+              Domain not verified —{' '}
+              <Link href="/domains" className="font-medium underline underline-offset-4">
+                Set up domain →
+              </Link>
+            </AlertDescription>
+          </Alert>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <Alert variant="destructive">
