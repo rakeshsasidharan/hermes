@@ -8,6 +8,12 @@ jest.mock('@/app/login/actions', () => ({
   loginAction: (...args: unknown[]) => mockLoginAction(...args),
 }));
 
+// ── Mock next/navigation ──────────────────────────────────────────────────────
+const mockPush = jest.fn();
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: mockPush }),
+}));
+
 // React's useActionState needs to be shimmed for jsdom
 jest.mock('react', () => ({
   ...jest.requireActual('react'),
@@ -27,6 +33,7 @@ jest.mock('react', () => ({
 describe('LoginForm', () => {
   beforeEach(() => {
     mockLoginAction.mockReset();
+    mockPush.mockReset();
   });
 
   test('renders username and password fields', () => {
@@ -59,5 +66,20 @@ describe('LoginForm', () => {
   test('does not show error alert on initial render', () => {
     render(<LoginForm />);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  test('redirects to / on successful login', async () => {
+    mockLoginAction.mockResolvedValueOnce({ success: true });
+
+    const user = userEvent.setup();
+    render(<LoginForm />);
+
+    await user.type(screen.getByLabelText(/username/i), 'admin');
+    await user.type(screen.getByLabelText(/password/i), 'password');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/');
+    });
   });
 });
