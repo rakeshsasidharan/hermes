@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Mail, FileText, Settings, LogOut, PenSquare } from 'lucide-react';
+import { Mail, FileText, Settings, LogOut, PenSquare, AtSign, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Address {
@@ -90,6 +90,34 @@ export function Sidebar({ addresses }: SidebarProps) {
           <Separator className="my-3" />
 
           <ul className="space-y-1">
+            <li>
+              <Link
+                href="/home"
+                className={cn(
+                  'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+                  pathname === '/home'
+                    ? 'bg-accent text-accent-foreground font-medium'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                )}
+              >
+                <AtSign className="h-4 w-4 shrink-0" />
+                Addresses
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/domains"
+                className={cn(
+                  'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+                  pathname === '/domains'
+                    ? 'bg-accent text-accent-foreground font-medium'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                )}
+              >
+                <Globe className="h-4 w-4 shrink-0" />
+                Domains
+              </Link>
+            </li>
             <li>
               <Link
                 href="/drafts"
