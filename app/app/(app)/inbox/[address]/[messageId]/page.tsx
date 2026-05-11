@@ -50,15 +50,23 @@ async function getMessage(id: string): Promise<Message | null> {
 
 interface Props {
   params: Promise<{ address: string; messageId: string }>;
+  searchParams: Promise<{ draftId?: string; mode?: string }>;
 }
 
-export default async function MessageDetailPage({ params }: Props) {
+export default async function MessageDetailPage({ params, searchParams }: Props) {
   const { messageId } = await params;
+  const { draftId, mode } = await searchParams;
   const message = await getMessage(messageId);
 
   if (!message) {
     notFound();
   }
 
-  return <MessageDetail message={message} />;
+  return (
+    <MessageDetail
+      message={message}
+      initialDraftId={draftId}
+      initialComposerMode={mode === 'replyAll' ? 'replyAll' : mode === 'reply' ? 'reply' : undefined}
+    />
+  );
 }

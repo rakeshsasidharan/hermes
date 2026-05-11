@@ -33,14 +33,16 @@ interface Message {
 
 interface MessageDetailProps {
   message: Message;
+  initialDraftId?: string;
+  initialComposerMode?: 'reply' | 'replyAll';
 }
 
-export function MessageDetail({ message }: MessageDetailProps) {
+export function MessageDetail({ message, initialDraftId, initialComposerMode }: MessageDetailProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [htmlBody, setHtmlBody] = useState<string | null>(null);
   const [textBody, setTextBody] = useState<string | null>(null);
   const [isRead, setIsRead] = useState(message.isRead);
-  const [composerMode, setComposerMode] = useState<'reply' | 'replyAll' | null>(null);
+  const [composerMode, setComposerMode] = useState<'reply' | 'replyAll' | null>(initialComposerMode ?? null);
 
   useEffect(() => {
     if (message.bodyHtmlUrl) {
@@ -182,6 +184,7 @@ export function MessageDetail({ message }: MessageDetailProps) {
           replyAll={composerMode === 'replyAll'}
           currentAddress={message.address ?? message.to ?? ''}
           quotedBody={textBody}
+          initialDraftId={initialDraftId}
           onClose={() => setComposerMode(null)}
         />
       )}
