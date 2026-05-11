@@ -127,14 +127,24 @@ describe('MessageDetail', () => {
     expect(downloadLinks).toHaveLength(2);
   });
 
-  test('shows reply notice on Reply click', async () => {
+  test('opens ReplyComposer on Reply click', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({}) });
     const user = userEvent.setup();
     render(<MessageDetail message={BASE_MSG} />);
 
     await user.click(screen.getByRole('button', { name: /^reply$/i }));
 
-    await waitFor(() => {
-      expect(screen.getByRole('status')).toHaveTextContent(/reply coming soon/i);
-    });
+    expect(screen.getByTestId('reply-composer')).toBeInTheDocument();
+  });
+
+  test('opens ReplyComposer in replyAll mode on Reply All click', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({}) });
+    const user = userEvent.setup();
+    render(<MessageDetail message={BASE_MSG} />);
+
+    await user.click(screen.getByRole('button', { name: /reply all/i }));
+
+    expect(screen.getByTestId('reply-composer')).toBeInTheDocument();
+    expect(screen.getByTestId('reply-cc')).toBeInTheDocument();
   });
 });

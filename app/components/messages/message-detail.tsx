@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Download, Reply, ReplyAll, MailOpen } from 'lucide-react';
+import { ReplyComposer } from '@/components/messages/reply-composer';
 
 interface Attachment {
   filename: string;
@@ -21,6 +22,7 @@ interface Message {
   subject: string;
   receivedAt: string;
   isRead: boolean;
+  address?: string;
   from?: string;
   to?: string;
   cc?: string;
@@ -38,7 +40,7 @@ export function MessageDetail({ message }: MessageDetailProps) {
   const [htmlBody, setHtmlBody] = useState<string | null>(null);
   const [textBody, setTextBody] = useState<string | null>(null);
   const [isRead, setIsRead] = useState(message.isRead);
-  const [replyNotice, setReplyNotice] = useState<string | null>(null);
+  const [composerMode, setComposerMode] = useState<'reply' | 'replyAll' | null>(null);
 
   useEffect(() => {
     if (message.bodyHtmlUrl) {
@@ -87,8 +89,11 @@ export function MessageDetail({ message }: MessageDetailProps) {
   }
 
   function handleReply() {
-    setReplyNotice('Reply coming soon');
-    setTimeout(() => setReplyNotice(null), 3000);
+    setComposerMode('reply');
+  }
+
+  function handleReplyAll() {
+    setComposerMode('replyAll');
   }
 
   return (
@@ -112,7 +117,7 @@ export function MessageDetail({ message }: MessageDetailProps) {
                   <Reply className="h-3.5 w-3.5" />
                   Reply
                 </Button>
-                <Button size="sm" variant="outline" onClick={handleReply} className="gap-1">
+                <Button size="sm" variant="outline" onClick={handleReplyAll} className="gap-1">
                   <ReplyAll className="h-3.5 w-3.5" />
                   Reply All
                 </Button>
@@ -125,21 +130,15 @@ export function MessageDetail({ message }: MessageDetailProps) {
           </div>
         </CardHeader>
 
-        {replyNotice && (
-          <div className="mx-6 mb-3 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground" role="status">
-            {replyNotice}
-          </div>
-        )}
-
         <Separator />
 
         <CardContent className="pt-4">
-          <ScrollArea className="h-[500px] w-full rounded-md">
+          <ScrollArea className="h-125 w-full rounded-md">
             {htmlBody ? (
               <iframe
                 ref={iframeRef}
                 sandbox="allow-same-origin"
-                className="w-full min-h-[480px] border-0"
+                className="w-full min-h-120 border-0"
                 title="Email body"
                 data-testid="html-body-frame"
               />
@@ -175,6 +174,16 @@ export function MessageDetail({ message }: MessageDetailProps) {
             </ul>
           </CardContent>
         </Card>
+      )}
+
+      {composerMode && (
+        <ReplyComposer
+          message={message}
+          replyAll={composerMode === 'replyAll'}
+          currentAddress={message.address ?? message.to ?? ''}
+          quotedBody={textBody}
+          onClose={() => setComposerMode(null)}
+        />
       )}
     </div>
   );
