@@ -4,10 +4,15 @@ import { Sidebar } from '@/components/layout/sidebar';
 
 const mockPush = jest.fn();
 const mockPathname = jest.fn().mockReturnValue('/');
+const mockOpenCompose = jest.fn();
 
 jest.mock('next/navigation', () => ({
   usePathname: () => mockPathname(),
   useRouter: () => ({ push: mockPush }),
+}));
+
+jest.mock('@/components/compose-context', () => ({
+  useCompose: () => ({ openCompose: mockOpenCompose, closeCompose: jest.fn(), isOpen: false, initialData: null }),
 }));
 
 jest.mock('@/components/ui/tooltip', () => ({
@@ -26,6 +31,7 @@ beforeEach(() => {
   global.fetch = jest.fn();
   mockPathname.mockReturnValue('/');
   mockPush.mockReset();
+  mockOpenCompose.mockReset();
 });
 
 afterEach(() => {
@@ -54,6 +60,15 @@ describe('Sidebar', () => {
     expect(screen.getByText('Compose')).toBeInTheDocument();
     expect(screen.getByText('Drafts')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
+  });
+
+  test('Compose button opens compose sheet via context', async () => {
+    const user = userEvent.setup();
+    render(<Sidebar addresses={ADDRESSES} />);
+
+    await user.click(screen.getByTestId('compose-button'));
+
+    expect(mockOpenCompose).toHaveBeenCalledTimes(1);
   });
 
   test('calls sign out on button click', async () => {

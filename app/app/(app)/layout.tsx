@@ -2,6 +2,8 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
+import { ComposeProvider } from '@/components/compose-context';
+import { ComposeSheet } from '@/components/messages/compose-sheet';
 
 interface Address {
   email: string;
@@ -38,12 +40,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const addresses = await getAddresses();
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar addresses={addresses} />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Topbar />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+    <ComposeProvider>
+      <div className="flex h-screen overflow-hidden">
+        <Sidebar addresses={addresses} />
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <Topbar />
+          <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        </div>
       </div>
-    </div>
+      <ComposeSheet addresses={addresses} />
+    </ComposeProvider>
   );
 }
