@@ -33,13 +33,21 @@ export interface HermesAppStackProps extends cdk.StackProps {
   domainName?: string;
   /** ACM certificate for domainName — must be in us-east-1. */
   certificate?: acm.ICertificate;
-  /** Route 53 hosted zone domain (e.g. rpillai.dev) for creating the A record alias. */
+  /** Route 53 hosted zone domain (e.g. rpillai.dev) for creating the A record alias and DNS onboarding. */
   hostedZoneDomainName?: string;
 }
 
 export class HermesAppStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: HermesAppStackProps) {
     super(scope, id, props);
+
+    // ── Hosted zone lookup (used for CloudFront A record and HOSTED_ZONE_ID env var) ──
+
+    const hostedZone = props.hostedZoneDomainName
+      ? route53.HostedZone.fromLookup(this, 'HostedZone', {
+          domainName: props.hostedZoneDomainName,
+        })
+      : undefined;
 
     // ── Lambda execution role ───────────────────────────────────────────────
 
@@ -62,6 +70,20 @@ export class HermesAppStack extends cdk.Stack {
         'ses:CreateReceiptRule',
         'ses:DeleteReceiptRule',
         'ses:DescribeReceiptRule',
+        // Extended domain onboarding permissions
+        'ses:VerifyDomainDkim',
+        'ses:GetIdentityVerificationAttributes',
+        'ses:GetIdentityDkimAttributes',
+      ],
+      resources: ['*'],
+    }));
+
+    executionRole.addToPolicy(new iam.PolicyStatement({
+      sid: 'Route53Permissions',
+      actions: [
+        'route53:ChangeResourceRecordSets',
+        'route53:GetChange',
+        'route53:ListHostedZonesByName',
       ],
       resources: ['*'],
     }));
@@ -108,6 +130,7 @@ export class HermesAppStack extends cdk.Stack {
         COGNITO_CLIENT_ID: props.userPoolClient.ref,
         WEBSOCKET_ENDPOINT: props.websocketEndpoint,
         INBOUND_PROCESSOR_ARN: props.inboundProcessorArn,
+        ...(hostedZone ? { HOSTED_ZONE_ID: hostedZone.hostedZoneId } : {}),
       },
     });
     cdk.Tags.of(appFunction).add(HERMES_TAG.key, HERMES_TAG.value);
@@ -135,10 +158,7 @@ export class HermesAppStack extends cdk.Stack {
     cdk.Tags.of(distribution).add(HERMES_TAG.key, HERMES_TAG.value);
 
     // ── Route 53 alias record ───────────────────────────────────────────────
-    if (props.domainName && props.hostedZoneDomainName) {
-      const hostedZone = route53.HostedZone.fromLookup(this, 'HostedZone', {
-        domainName: props.hostedZoneDomainName,
-      });
+    if (props.domainName && hostedZone) {
       new route53.ARecord(this, 'AppARecord', {
         zone: hostedZone,
         recordName: props.domainName,
