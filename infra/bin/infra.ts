@@ -6,20 +6,26 @@ import { HermesEmailStack } from '../lib/hermes-email-stack';
 import { HermesWebSocketStack } from '../lib/hermes-websocket-stack';
 import { HermesAppStack } from '../lib/hermes-app-stack';
 import { HermesCertStack } from '../lib/hermes-cert-stack';
+import { getConfig } from '../lib/config';
 
 const app = new cdk.App();
+const config = getConfig(app);
 
 const env = {
   account: process.env.CDK_DEFAULT_ACCOUNT,
   region: process.env.CDK_DEFAULT_REGION,
 };
 
-const DOMAIN_NAME = 'hermes.rpillai.dev';
-const HOSTED_ZONE_DOMAIN = 'rpillai.dev';
-
 const authStack = new HermesAuthStack(app, 'HermesAuthStack', { env });
 
-const storageStack = new HermesStorageStack(app, 'HermesStorageStack', { env });
+const storageStack = new HermesStorageStack(app, 'HermesStorageStack', {
+  env,
+  emailBucketName: config.emailBucketName,
+  addressesTableName: config.addressesTableName,
+  messagesTableName: config.messagesTableName,
+  draftsTableName: config.draftsTableName,
+  wsConnectionsTableName: config.wsConnectionsTableName,
+});
 
 const webSocketStack = new HermesWebSocketStack(app, 'HermesWebSocketStack', {
   env,
@@ -34,13 +40,14 @@ const emailStack = new HermesEmailStack(app, 'HermesEmailStack', {
   wsConnectionsTable: storageStack.wsConnectionsTable,
   websocketApiEndpoint: webSocketStack.webSocketEndpoint,
   websocketApiArn: webSocketStack.webSocketApiArn,
+  sesRuleSetName: config.sesRuleSetName,
 });
 
 // ACM certificate must be in us-east-1 for CloudFront.
 const certStack = new HermesCertStack(app, 'HermesCertStack', {
   env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: 'us-east-1' },
-  domainName: DOMAIN_NAME,
-  hostedZoneDomainName: HOSTED_ZONE_DOMAIN,
+  domainName: config.domainName,
+  hostedZoneDomainName: config.hostedZoneDomainName,
   crossRegionReferences: true,
 });
 
@@ -52,12 +59,12 @@ new HermesAppStack(app, 'HermesAppStack', {
   messagesTable: storageStack.messagesTable,
   draftsTable: storageStack.draftsTable,
   wsConnectionsTable: storageStack.wsConnectionsTable,
-  sesRuleSetName: 'hermes-receipt-rules',
+  sesRuleSetName: config.sesRuleSetName,
   websocketEndpoint: webSocketStack.webSocketEndpoint,
   inboundProcessorArn: emailStack.inboundEmailProcessor.functionArn,
   userPool: authStack.userPool,
   userPoolClient: authStack.userPoolClient,
-  domainName: DOMAIN_NAME,
+  domainName: config.domainName,
   certificate: certStack.certificate,
-  hostedZoneDomainName: HOSTED_ZONE_DOMAIN,
+  hostedZoneDomainName: config.hostedZoneDomainName,
 });

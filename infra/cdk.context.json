@@ -1,4 +1,7 @@
 {
+  "domainName": "hermes.rpillai.dev",
+  "hostedZoneDomainName": "rpillai.dev",
+
   "hosted-zone:account=380295607300:domainName=rpillai.dev:region=us-east-1": {
     "Id": "/hostedzone/Z09448923GM8JYHLHFY03",
     "Name": "rpillai.dev."
