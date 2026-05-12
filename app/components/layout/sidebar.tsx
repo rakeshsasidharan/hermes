@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useWs } from '@/components/ws-context';
+import { useCompose } from '@/components/compose-context';
 
 import { Mail, FileText, Settings, LogOut, PenSquare, Globe } from 'lucide-react';
 
@@ -48,6 +49,7 @@ export function Sidebar({ addresses }: SidebarProps) {
       });
     });
   }, [subscribe]);
+  const { openCompose } = useCompose();
 
   async function handleSignOut() {
     await fetch('/api/auth/signout', { method: 'POST' });
@@ -62,11 +64,15 @@ export function Sidebar({ addresses }: SidebarProps) {
         </div>
 
         <div className="flex flex-col gap-1 p-3">
-          <Button asChild variant="default" size="sm" className="w-full justify-start gap-2">
-            <Link href="/compose">
-              <PenSquare className="h-4 w-4" />
-              Compose
-            </Link>
+          <Button
+            variant="default"
+            size="sm"
+            className="w-full justify-start gap-2"
+            onClick={() => openCompose()}
+            data-testid="compose-button"
+          >
+            <PenSquare className="h-4 w-4" />
+            Compose
           </Button>
         </div>
 

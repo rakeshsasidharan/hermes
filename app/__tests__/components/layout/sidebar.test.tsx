@@ -5,6 +5,7 @@ import type { WsNewMessageEvent } from '@/lib/ws';
 
 const mockPush = jest.fn();
 const mockPathname = jest.fn().mockReturnValue('/');
+const mockOpenCompose = jest.fn();
 
 jest.mock('next/navigation', () => ({
   usePathname: () => mockPathname(),
@@ -19,6 +20,8 @@ const mockSubscribe = jest.fn((handler: (event: WsNewMessageEvent) => void) => {
 
 jest.mock('@/components/ws-context', () => ({
   useWs: () => ({ subscribe: mockSubscribe }),
+jest.mock('@/components/compose-context', () => ({
+  useCompose: () => ({ openCompose: mockOpenCompose, closeCompose: jest.fn(), isOpen: false, initialData: null }),
 }));
 
 jest.mock('@/components/ui/tooltip', () => ({
@@ -39,6 +42,7 @@ beforeEach(() => {
   mockPush.mockReset();
   wsHandler = null;
   mockSubscribe.mockClear();
+  mockOpenCompose.mockReset();
 });
 
 afterEach(() => {
@@ -90,6 +94,13 @@ describe('Sidebar', () => {
     await waitFor(() => {
       expect(screen.getByText('1')).toBeInTheDocument();
     });
+  test('Compose button opens compose sheet via context', async () => {
+    const user = userEvent.setup();
+    render(<Sidebar addresses={ADDRESSES} />);
+
+    await user.click(screen.getByTestId('compose-button'));
+
+    expect(mockOpenCompose).toHaveBeenCalledTimes(1);
   });
 
   test('calls sign out on button click', async () => {

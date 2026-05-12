@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
 import { WebSocketProvider } from '@/components/ws-context';
+import { ComposeProvider } from '@/components/compose-context';
+import { ComposeSheet } from '@/components/messages/compose-sheet';
 
 interface Address {
   email: string;
@@ -41,6 +43,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <WebSocketProvider token={token} wsEndpoint={wsEndpoint}>
+    <ComposeProvider>
       <div className="flex h-screen overflow-hidden">
         <Sidebar addresses={addresses} />
         <div className="flex flex-1 flex-col overflow-hidden">
@@ -49,5 +52,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </div>
     </WebSocketProvider>
+      <ComposeSheet addresses={addresses} />
+    </ComposeProvider>
   );
 }
