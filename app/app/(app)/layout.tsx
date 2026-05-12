@@ -43,16 +43,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <WebSocketProvider token={token} wsEndpoint={wsEndpoint}>
-    <ComposeProvider>
-      <div className="flex h-screen overflow-hidden">
-        <Sidebar addresses={addresses} />
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <Topbar />
-          <main className="flex-1 overflow-y-auto p-6">{children}</main>
+      <ComposeProvider>
+        <div className="flex h-screen overflow-hidden">
+          <Sidebar addresses={addresses} />
+          <div className="flex flex-1 flex-col overflow-hidden">
+            <Topbar />
+            <main className="flex-1 overflow-y-auto p-6">{children}</main>
+          </div>
         </div>
-      </div>
+        <ComposeSheet addresses={addresses} />
+      </ComposeProvider>
     </WebSocketProvider>
-      <ComposeSheet addresses={addresses} />
-    </ComposeProvider>
   );
 }
