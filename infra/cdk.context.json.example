@@ -1,0 +1,13 @@
+{
+  "_comment": "Copy this file to cdk.context.json and fill in the required values. Do NOT commit cdk.context.json with real values.",
+
+  "domainName": "hermes.example.com",
+  "hostedZoneDomainName": "example.com",
+
+  "sesRuleSetName": "hermes-receipt-rules",
+  "emailBucketName": "hermes-email-store",
+  "addressesTableName": "hermes-addresses",
+  "messagesTableName": "hermes-messages",
+  "draftsTableName": "hermes-drafts",
+  "wsConnectionsTableName": "hermes-ws-connections"
+}

@@ -5,6 +5,14 @@ import { Construct } from 'constructs';
 
 const HERMES_TAG = { key: 'Project', value: 'hermes' };
 
+export interface HermesStorageStackProps extends cdk.StackProps {
+  emailBucketName?: string;
+  addressesTableName?: string;
+  messagesTableName?: string;
+  draftsTableName?: string;
+  wsConnectionsTableName?: string;
+}
+
 export class HermesStorageStack extends cdk.Stack {
   public readonly emailBucket: s3.Bucket;
   public readonly addressesTable: dynamodb.Table;
@@ -12,11 +20,11 @@ export class HermesStorageStack extends cdk.Stack {
   public readonly draftsTable: dynamodb.Table;
   public readonly wsConnectionsTable: dynamodb.Table;
 
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props?: HermesStorageStackProps) {
     super(scope, id, props);
 
     this.emailBucket = new s3.Bucket(this, 'EmailStore', {
-      bucketName: 'hermes-email-store',
+      bucketName: props?.emailBucketName ?? 'hermes-email-store',
       encryption: s3.BucketEncryption.S3_MANAGED,
       versioned: true,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -35,7 +43,7 @@ export class HermesStorageStack extends cdk.Stack {
     cdk.Tags.of(this.emailBucket).add(HERMES_TAG.key, HERMES_TAG.value);
 
     this.addressesTable = new dynamodb.Table(this, 'AddressesTable', {
-      tableName: 'hermes-addresses',
+      tableName: props?.addressesTableName ?? 'hermes-addresses',
       partitionKey: { name: 'email', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -43,7 +51,7 @@ export class HermesStorageStack extends cdk.Stack {
     cdk.Tags.of(this.addressesTable).add(HERMES_TAG.key, HERMES_TAG.value);
 
     this.messagesTable = new dynamodb.Table(this, 'MessagesTable', {
-      tableName: 'hermes-messages',
+      tableName: props?.messagesTableName ?? 'hermes-messages',
       partitionKey: { name: 'messageId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -56,7 +64,7 @@ export class HermesStorageStack extends cdk.Stack {
     cdk.Tags.of(this.messagesTable).add(HERMES_TAG.key, HERMES_TAG.value);
 
     this.draftsTable = new dynamodb.Table(this, 'DraftsTable', {
-      tableName: 'hermes-drafts',
+      tableName: props?.draftsTableName ?? 'hermes-drafts',
       partitionKey: { name: 'draftId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -64,7 +72,7 @@ export class HermesStorageStack extends cdk.Stack {
     cdk.Tags.of(this.draftsTable).add(HERMES_TAG.key, HERMES_TAG.value);
 
     this.wsConnectionsTable = new dynamodb.Table(this, 'WsConnectionsTable', {
-      tableName: 'hermes-ws-connections',
+      tableName: props?.wsConnectionsTableName ?? 'hermes-ws-connections',
       partitionKey: { name: 'connectionId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       timeToLiveAttribute: 'ttl',

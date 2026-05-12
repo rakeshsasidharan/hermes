@@ -19,6 +19,7 @@ export interface HermesEmailStackProps extends cdk.StackProps {
   wsConnectionsTable: dynamodb.ITable;
   websocketApiEndpoint: string;
   websocketApiArn: string;
+  sesRuleSetName?: string;
 }
 
 export class HermesEmailStack extends cdk.Stack {
@@ -30,7 +31,7 @@ export class HermesEmailStack extends cdk.Stack {
     super(scope, id, props);
 
     this.receiptRuleSet = new ses.CfnReceiptRuleSet(this, 'ReceiptRuleSet', {
-      ruleSetName: 'hermes-receipt-rules',
+      ruleSetName: props.sesRuleSetName ?? 'hermes-receipt-rules',
     });
 
     new cr.AwsCustomResource(this, 'ActiveReceiptRuleSet', {
