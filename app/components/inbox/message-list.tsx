@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Table,
@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Paperclip } from 'lucide-react';
 import { FilterBar, type Filters } from './filter-bar';
+import { useWs } from '@/components/ws-context';
 import { cn } from '@/lib/utils';
 
 interface Attachment {
@@ -42,10 +43,21 @@ const EMPTY_FILTERS: Filters = { sender: '', subject: '', from: '', to: '' };
 
 export function MessageList({ address, initialMessages, initialNextCursor }: MessageListProps) {
   const router = useRouter();
+  const { subscribe } = useWs();
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [nextCursor, setNextCursor] = useState<string | null>(initialNextCursor);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    return subscribe((event) => {
+      if (event.address !== address) return;
+      setMessages((prev) => {
+        if (prev.some((m) => m.messageId === event.message.messageId)) return prev;
+        return [event.message, ...prev];
+      });
+    });
+  }, [subscribe, address]);
 
   async function fetchMessages(cursor?: string, newFilters?: Filters) {
     setIsLoading(true);
@@ -134,7 +146,7 @@ export function MessageList({ address, initialMessages, initialNextCursor }: Mes
                     {!msg.isRead && (
                       <Badge variant="default" className="h-4 w-4 shrink-0 rounded-full p-0" aria-label="Unread" />
                     )}
-                    <span className="truncate max-w-[180px]">{msg.sender}</span>
+                    <span className="truncate max-w-45">{msg.sender}</span>
                   </div>
                 </TableCell>
                 <TableCell className="py-2 truncate max-w-xs">{msg.subject}</TableCell>

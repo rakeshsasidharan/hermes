@@ -1,6 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Sidebar } from '@/components/layout/sidebar';
+import type { WsNewMessageEvent } from '@/lib/ws';
 
 const mockPush = jest.fn();
 const mockPathname = jest.fn().mockReturnValue('/');
@@ -8,6 +9,16 @@ const mockPathname = jest.fn().mockReturnValue('/');
 jest.mock('next/navigation', () => ({
   usePathname: () => mockPathname(),
   useRouter: () => ({ push: mockPush }),
+}));
+
+let wsHandler: ((event: WsNewMessageEvent) => void) | null = null;
+const mockSubscribe = jest.fn((handler: (event: WsNewMessageEvent) => void) => {
+  wsHandler = handler;
+  return () => { wsHandler = null; };
+});
+
+jest.mock('@/components/ws-context', () => ({
+  useWs: () => ({ subscribe: mockSubscribe }),
 }));
 
 jest.mock('@/components/ui/tooltip', () => ({
@@ -26,6 +37,8 @@ beforeEach(() => {
   global.fetch = jest.fn();
   mockPathname.mockReturnValue('/');
   mockPush.mockReset();
+  wsHandler = null;
+  mockSubscribe.mockClear();
 });
 
 afterEach(() => {
@@ -54,6 +67,29 @@ describe('Sidebar', () => {
     expect(screen.getByText('Compose')).toBeInTheDocument();
     expect(screen.getByText('Drafts')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
+  });
+
+  test('increments unread badge when WebSocket new_message event arrives', async () => {
+    render(<Sidebar addresses={ADDRESSES} />);
+
+    act(() => {
+      wsHandler?.({
+        type: 'new_message',
+        address: 'info@example.com',
+        message: {
+          messageId: 'msg-new',
+          address: 'info@example.com',
+          sender: 'x@test.com',
+          subject: 'New',
+          receivedAt: new Date().toISOString(),
+          isRead: false,
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('1')).toBeInTheDocument();
+    });
   });
 
   test('calls sign out on button click', async () => {
