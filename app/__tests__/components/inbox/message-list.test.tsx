@@ -1,6 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MessageList } from '@/components/inbox/message-list';
+import type { WsNewMessageEvent } from '@/lib/ws';
 
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn().mockReturnValue({ push: jest.fn() }),
@@ -12,6 +13,16 @@ jest.mock('@/components/inbox/filter-bar', () => ({
       Apply filter
     </button>
   ),
+}));
+
+let wsHandler: ((event: WsNewMessageEvent) => void) | null = null;
+const mockSubscribe = jest.fn((handler: (event: WsNewMessageEvent) => void) => {
+  wsHandler = handler;
+  return () => { wsHandler = null; };
+});
+
+jest.mock('@/components/ws-context', () => ({
+  useWs: () => ({ subscribe: mockSubscribe }),
 }));
 
 const MESSAGES = [
@@ -37,6 +48,8 @@ const MESSAGES = [
 
 beforeEach(() => {
   global.fetch = jest.fn();
+  wsHandler = null;
+  mockSubscribe.mockClear();
 });
 
 afterEach(() => {
@@ -101,6 +114,66 @@ describe('MessageList', () => {
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('sender=alice'));
     });
+  });
+
+  test('prepends new message from WebSocket event for the same address', async () => {
+    render(<MessageList address="hello@example.com" initialMessages={MESSAGES} initialNextCursor={null} />);
+
+    act(() => {
+      wsHandler?.({
+        type: 'new_message',
+        address: 'hello@example.com',
+        message: {
+          messageId: 'msg-ws',
+          address: 'hello@example.com',
+          sender: 'carol@test.com',
+          subject: 'Real-time',
+          receivedAt: new Date().toISOString(),
+          isRead: false,
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('carol@test.com')).toBeInTheDocument();
+    });
+    const rows = screen.getAllByRole('row');
+    expect(rows[1]).toHaveTextContent('carol@test.com');
+  });
+
+  test('ignores WebSocket events for a different address', async () => {
+    render(<MessageList address="hello@example.com" initialMessages={MESSAGES} initialNextCursor={null} />);
+
+    act(() => {
+      wsHandler?.({
+        type: 'new_message',
+        address: 'other@example.com',
+        message: {
+          messageId: 'msg-other',
+          address: 'other@example.com',
+          sender: 'dave@test.com',
+          subject: 'Wrong inbox',
+          receivedAt: new Date().toISOString(),
+          isRead: false,
+        },
+      });
+    });
+
+    expect(screen.queryByText('dave@test.com')).not.toBeInTheDocument();
+  });
+
+  test('does not duplicate a message already present', async () => {
+    render(<MessageList address="hello@example.com" initialMessages={MESSAGES} initialNextCursor={null} />);
+
+    act(() => {
+      wsHandler?.({
+        type: 'new_message',
+        address: 'hello@example.com',
+        message: { ...MESSAGES[0] },
+      });
+    });
+
+    expect(screen.getAllByText('alice@test.com')).toHaveLength(1);
   });
 
   test('navigates to message detail on row click', async () => {

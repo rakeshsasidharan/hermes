@@ -1,6 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Sidebar } from '@/components/layout/sidebar';
+import type { WsNewMessageEvent } from '@/lib/ws';
 
 const mockPush = jest.fn();
 const mockPathname = jest.fn().mockReturnValue('/');
@@ -11,6 +12,14 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
+let wsHandler: ((event: WsNewMessageEvent) => void) | null = null;
+const mockSubscribe = jest.fn((handler: (event: WsNewMessageEvent) => void) => {
+  wsHandler = handler;
+  return () => { wsHandler = null; };
+});
+
+jest.mock('@/components/ws-context', () => ({
+  useWs: () => ({ subscribe: mockSubscribe }),
 jest.mock('@/components/compose-context', () => ({
   useCompose: () => ({ openCompose: mockOpenCompose, closeCompose: jest.fn(), isOpen: false, initialData: null }),
 }));
@@ -31,6 +40,8 @@ beforeEach(() => {
   global.fetch = jest.fn();
   mockPathname.mockReturnValue('/');
   mockPush.mockReset();
+  wsHandler = null;
+  mockSubscribe.mockClear();
   mockOpenCompose.mockReset();
 });
 
@@ -62,6 +73,27 @@ describe('Sidebar', () => {
     expect(screen.getByText('Settings')).toBeInTheDocument();
   });
 
+  test('increments unread badge when WebSocket new_message event arrives', async () => {
+    render(<Sidebar addresses={ADDRESSES} />);
+
+    act(() => {
+      wsHandler?.({
+        type: 'new_message',
+        address: 'info@example.com',
+        message: {
+          messageId: 'msg-new',
+          address: 'info@example.com',
+          sender: 'x@test.com',
+          subject: 'New',
+          receivedAt: new Date().toISOString(),
+          isRead: false,
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('1')).toBeInTheDocument();
+    });
   test('Compose button opens compose sheet via context', async () => {
     const user = userEvent.setup();
     render(<Sidebar addresses={ADDRESSES} />);

@@ -2,10 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useWs } from '@/components/ws-context';
 import { useCompose } from '@/components/compose-context';
 
 import { Mail, FileText, Settings, LogOut, PenSquare, Globe } from 'lucide-react';
@@ -26,6 +28,27 @@ interface SidebarProps {
 export function Sidebar({ addresses }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { subscribe } = useWs();
+
+  const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(() => {
+    const map = new Map<string, number>();
+    for (const addr of addresses) {
+      if (addr.unreadCount && addr.unreadCount > 0) {
+        map.set(addr.email, addr.unreadCount);
+      }
+    }
+    return map;
+  });
+
+  useEffect(() => {
+    return subscribe((event) => {
+      setUnreadCounts((prev) => {
+        const next = new Map(prev);
+        next.set(event.address, (next.get(event.address) ?? 0) + 1);
+        return next;
+      });
+    });
+  }, [subscribe]);
   const { openCompose } = useCompose();
 
   async function handleSignOut() {
@@ -63,6 +86,7 @@ export function Sidebar({ addresses }: SidebarProps) {
             {addresses.map((addr) => {
               const href = `/inbox/${encodeURIComponent(addr.email)}`;
               const active = pathname.startsWith(href);
+              const count = unreadCounts.get(addr.email) ?? 0;
               return (
                 <li key={addr.email}>
                   <Tooltip>
@@ -78,9 +102,9 @@ export function Sidebar({ addresses }: SidebarProps) {
                       >
                         <Mail className="h-4 w-4 shrink-0" />
                         <span className="flex-1 truncate">{addr.email}</span>
-                        {addr.unreadCount && addr.unreadCount > 0 ? (
+                        {count > 0 ? (
                           <Badge variant="default" className="ml-auto h-5 shrink-0 text-xs">
-                            {addr.unreadCount}
+                            {count}
                           </Badge>
                         ) : null}
                       </Link>
