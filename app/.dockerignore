@@ -1,0 +1,9 @@
+.git
+.gitignore
+.next
+node_modules
+__tests__
+*.test.ts
+*.test.tsx
+*.md
+.env*
