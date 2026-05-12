@@ -55,7 +55,7 @@ const composeSchema = z.object({
     .optional()
     .or(z.literal('')),
   subject: z.string().min(1, 'Subject is required'),
-  body: z.string().default(''),
+  body: z.string(),
 });
 
 type ComposeFormValues = z.infer<typeof composeSchema>;
