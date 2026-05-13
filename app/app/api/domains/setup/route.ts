@@ -37,87 +37,94 @@ export async function POST(req: NextRequest) {
   const ses = new SESClient({ region });
   const r53 = new Route53Client({ region });
 
-  // Reject if domain is already active in SES
-  const attrsResult = await ses.send(
-    new GetIdentityVerificationAttributesCommand({ Identities: [domain] }),
-  );
-  if (attrsResult.VerificationAttributes?.[domain]?.VerificationStatus === 'Success') {
-    return NextResponse.json({ error: 'Domain is already verified in SES' }, { status: 409 });
-  }
-
-  // Register domain with SES and obtain verification token + DKIM tokens
-  const [identityResult, dkimResult] = await Promise.all([
-    ses.send(new VerifyDomainIdentityCommand({ Domain: domain })),
-    ses.send(new VerifyDomainDkimCommand({ Domain: domain })),
-  ]);
-  const verificationToken = identityResult.VerificationToken;
-  const dkimTokens = dkimResult.DkimTokens ?? [];
-
-  // Resolve the Route 53 hosted zone
-  let zoneId: string;
-  const envZoneId = process.env.HOSTED_ZONE_ID;
-  if (envZoneId) {
-    zoneId = envZoneId.replace(/^\/hostedzone\//, '');
-  } else {
-    const zonesResult = await r53.send(
-      new ListHostedZonesByNameCommand({ DNSName: domain, MaxItems: 1 }),
+  try {
+    // Reject if domain is already active in SES
+    const attrsResult = await ses.send(
+      new GetIdentityVerificationAttributesCommand({ Identities: [domain] }),
     );
-    const zone = zonesResult.HostedZones?.[0];
-    const zoneName = zone?.Name?.replace(/\.$/, '') ?? '';
-    if (!zone?.Id || !(domain === zoneName || domain.endsWith(`.${zoneName}`))) {
-      return NextResponse.json(
-        { error: `No Route 53 hosted zone found for ${domain}` },
-        { status: 422 },
-      );
+    if (attrsResult.VerificationAttributes?.[domain]?.VerificationStatus === 'Success') {
+      return NextResponse.json({ error: 'Domain is already verified in SES' }, { status: 409 });
     }
-    zoneId = zone.Id.replace(/^\/hostedzone\//, '');
-  }
 
-  // Create domain verification TXT record, DKIM CNAME records, and MX record via Route 53
-  const changes = [
-    ...(verificationToken
-      ? [
+    // Register domain with SES and obtain verification token + DKIM tokens
+    const [identityResult, dkimResult] = await Promise.all([
+      ses.send(new VerifyDomainIdentityCommand({ Domain: domain })),
+      ses.send(new VerifyDomainDkimCommand({ Domain: domain })),
+    ]);
+    const verificationToken = identityResult.VerificationToken;
+    const dkimTokens = dkimResult.DkimTokens ?? [];
+
+    // Resolve the Route 53 hosted zone
+    let zoneId: string;
+    const envZoneId = process.env.HOSTED_ZONE_ID;
+    if (envZoneId) {
+      zoneId = envZoneId.replace(/^\/hostedzone\//, '');
+    } else {
+      const zonesResult = await r53.send(
+        new ListHostedZonesByNameCommand({ DNSName: domain, MaxItems: 1 }),
+      );
+      const zone = zonesResult.HostedZones?.[0];
+      const zoneName = zone?.Name?.replace(/\.$/, '') ?? '';
+      if (!zone?.Id || !(domain === zoneName || domain.endsWith(`.${zoneName}`))) {
+        return NextResponse.json(
           {
-            Action: ChangeAction.CREATE,
-            ResourceRecordSet: {
-              Name: `_amazonses.${domain}`,
-              Type: RRType.TXT,
-              TTL: 1800,
-              ResourceRecords: [{ Value: `"${verificationToken}"` }],
-            },
+            error: `${domain} is not hosted in Route 53. To use this domain with Hermes, add it as a hosted zone in Route 53 first.`,
           },
-        ]
-      : []),
-    ...dkimTokens.map((token) => ({
-      Action: ChangeAction.CREATE,
-      ResourceRecordSet: {
-        Name: `${token}._domainkey.${domain}`,
-        Type: RRType.CNAME,
-        TTL: 1800,
-        ResourceRecords: [{ Value: `${token}.dkim.amazonses.com` }],
-      },
-    })),
-    {
-      Action: ChangeAction.CREATE,
-      ResourceRecordSet: {
-        Name: `${domain}.`,
-        Type: RRType.MX,
-        TTL: 300,
-        ResourceRecords: [{ Value: `10 inbound-smtp.${region}.amazonaws.com` }],
-      },
-    },
-  ];
+          { status: 422 },
+        );
+      }
+      zoneId = zone.Id.replace(/^\/hostedzone\//, '');
+    }
 
-  const changeResult = await r53.send(
-    new ChangeResourceRecordSetsCommand({
-      HostedZoneId: zoneId,
-      ChangeBatch: { Changes: changes },
-    }),
-  );
+    // Create domain verification TXT record, DKIM CNAME records, and MX record via Route 53
+    const changes = [
+      ...(verificationToken
+        ? [
+            {
+              Action: ChangeAction.CREATE,
+              ResourceRecordSet: {
+                Name: `_amazonses.${domain}`,
+                Type: RRType.TXT,
+                TTL: 1800,
+                ResourceRecords: [{ Value: `"${verificationToken}"` }],
+              },
+            },
+          ]
+        : []),
+      ...dkimTokens.map((token) => ({
+        Action: ChangeAction.CREATE,
+        ResourceRecordSet: {
+          Name: `${token}._domainkey.${domain}`,
+          Type: RRType.CNAME,
+          TTL: 1800,
+          ResourceRecords: [{ Value: `${token}.dkim.amazonses.com` }],
+        },
+      })),
+      {
+        Action: ChangeAction.CREATE,
+        ResourceRecordSet: {
+          Name: `${domain}.`,
+          Type: RRType.MX,
+          TTL: 300,
+          ResourceRecords: [{ Value: `10 inbound-smtp.${region}.amazonaws.com` }],
+        },
+      },
+    ];
 
-  return NextResponse.json({
-    domain,
-    status: 'pending',
-    changeId: changeResult.ChangeInfo?.Id ?? null,
-  });
+    const changeResult = await r53.send(
+      new ChangeResourceRecordSetsCommand({
+        HostedZoneId: zoneId,
+        ChangeBatch: { Changes: changes },
+      }),
+    );
+
+    return NextResponse.json({
+      domain,
+      status: 'pending',
+      changeId: changeResult.ChangeInfo?.Id ?? null,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return NextResponse.json({ error: `Domain setup failed: ${message}` }, { status: 500 });
+  }
 }
