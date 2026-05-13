@@ -1,4 +1,5 @@
 import * as cdk from 'aws-cdk-lib/core';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import { Construct } from 'constructs';
@@ -41,6 +42,17 @@ export class HermesStorageStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
     cdk.Tags.of(this.emailBucket).add(HERMES_TAG.key, HERMES_TAG.value);
+
+    this.emailBucket.addToResourcePolicy(new iam.PolicyStatement({
+      sid: 'AllowSESPut',
+      effect: iam.Effect.ALLOW,
+      principals: [new iam.ServicePrincipal('ses.amazonaws.com')],
+      actions: ['s3:PutObject'],
+      resources: [this.emailBucket.arnForObjects('*')],
+      conditions: {
+        StringEquals: { 'AWS:SourceAccount': cdk.Stack.of(this).account },
+      },
+    }));
 
     this.addressesTable = new dynamodb.Table(this, 'AddressesTable', {
       tableName: props?.addressesTableName ?? 'hermes-addresses',
