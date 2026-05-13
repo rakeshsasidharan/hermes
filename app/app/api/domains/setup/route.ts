@@ -63,7 +63,8 @@ export async function POST(req: NextRequest) {
       new ListHostedZonesByNameCommand({ DNSName: domain, MaxItems: 1 }),
     );
     const zone = zonesResult.HostedZones?.[0];
-    if (!zone?.Id) {
+    const zoneName = zone?.Name?.replace(/\.$/, '') ?? '';
+    if (!zone?.Id || !(domain === zoneName || domain.endsWith(`.${zoneName}`))) {
       return NextResponse.json(
         { error: `No Route 53 hosted zone found for ${domain}` },
         { status: 422 },
