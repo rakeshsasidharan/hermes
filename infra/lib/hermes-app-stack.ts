@@ -71,6 +71,7 @@ export class HermesAppStack extends cdk.Stack {
         'ses:DeleteReceiptRule',
         'ses:DescribeReceiptRule',
         // Extended domain onboarding permissions
+        'ses:VerifyDomainIdentity',
         'ses:VerifyDomainDkim',
         'ses:GetIdentityVerificationAttributes',
         'ses:GetIdentityDkimAttributes',
