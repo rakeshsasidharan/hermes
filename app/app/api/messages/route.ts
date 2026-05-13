@@ -105,7 +105,7 @@ export async function GET(req: NextRequest) {
     ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
     : null;
 
-  return NextResponse.json({ items: result.Items ?? [], nextCursor });
+  return NextResponse.json({ messages: result.Items ?? [], nextCursor });
 }
 
 export async function POST(req: NextRequest) {
