@@ -95,8 +95,8 @@ describe('GET /api/messages', () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.items).toHaveLength(2);
-    expect(body.items[0].messageId).toBe('msg-2');
+    expect(body.messages).toHaveLength(2);
+    expect(body.messages[0].messageId).toBe('msg-2');
     expect(body.nextCursor).toBeNull();
   });
 
