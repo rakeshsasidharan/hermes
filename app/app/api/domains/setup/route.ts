@@ -38,6 +38,23 @@ export async function POST(req: NextRequest) {
   const r53 = new Route53Client({ region });
 
   try {
+    // Verify Route 53 hosted zone exists for this domain BEFORE touching SES,
+    // so we never leave a dangling SES identity if the zone is missing.
+    const zonesResult = await r53.send(
+      new ListHostedZonesByNameCommand({ DNSName: domain, MaxItems: 1 }),
+    );
+    const zone = zonesResult.HostedZones?.[0];
+    const zoneName = zone?.Name?.replace(/\.$/, '') ?? '';
+    if (!zone?.Id || !(domain === zoneName || domain.endsWith(`.${zoneName}`))) {
+      return NextResponse.json(
+        {
+          error: `${domain} is not hosted in Route 53. To use this domain with Hermes, add it as a hosted zone in Route 53 first.`,
+        },
+        { status: 422 },
+      );
+    }
+    const zoneId = zone.Id.replace(/^\/hostedzone\//, '');
+
     // Reject if domain is already active in SES
     const attrsResult = await ses.send(
       new GetIdentityVerificationAttributesCommand({ Identities: [domain] }),
@@ -53,24 +70,6 @@ export async function POST(req: NextRequest) {
     ]);
     const verificationToken = identityResult.VerificationToken;
     const dkimTokens = dkimResult.DkimTokens ?? [];
-
-    // Resolve the Route 53 hosted zone — always look up by domain name so
-    // HOSTED_ZONE_ID (which points at the app's own zone) is never blindly
-    // used for a different domain.
-    const zonesResult = await r53.send(
-      new ListHostedZonesByNameCommand({ DNSName: domain, MaxItems: 1 }),
-    );
-    const zone = zonesResult.HostedZones?.[0];
-    const zoneName = zone?.Name?.replace(/\.$/, '') ?? '';
-    if (!zone?.Id || !(domain === zoneName || domain.endsWith(`.${zoneName}`))) {
-      return NextResponse.json(
-        {
-          error: `${domain} is not hosted in Route 53. To use this domain with Hermes, add it as a hosted zone in Route 53 first.`,
-        },
-        { status: 422 },
-      );
-    }
-    const zoneId = zone.Id.replace(/^\/hostedzone\//, '');
 
     // Create domain verification TXT record, DKIM CNAME records, and MX record via Route 53
     const changes = [
