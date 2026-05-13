@@ -20,14 +20,17 @@ async function fetchDomains(cookieHeader: string) {
 export default async function AddressesPage() {
   const cookieStore = await cookies();
   const cookieHeader = cookieStore.toString();
-  const [addresses, domains] = await Promise.all([
+  const [addresses, rawDomains] = await Promise.all([
     fetchAddresses(cookieHeader),
     fetchDomains(cookieHeader),
   ]);
+  const verifiedDomains = rawDomains
+    .filter((d: { status: string }) => d.status === 'Verified')
+    .map((d: { domain: string }) => d.domain);
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-6">Addresses</h1>
-      <AddressList addresses={addresses} domains={domains} />
+      <AddressList addresses={addresses} domains={verifiedDomains} />
     </div>
   );
 }
