@@ -93,6 +93,11 @@ export class HermesEmailStack extends cdk.Stack {
     props.messagesTable.grantReadWriteData(this.inboundEmailProcessor);
     props.wsConnectionsTable.grantReadWriteData(this.inboundEmailProcessor);
 
+    this.inboundEmailProcessor.addPermission('AllowSESInvoke', {
+      principal: new iam.ServicePrincipal('ses.amazonaws.com'),
+      sourceAccount: this.account,
+    });
+
     this.inboundEmailProcessor.addToRolePolicy(new iam.PolicyStatement({
       sid: 'AllowWebSocketManageConnections',
       actions: ['execute-api:ManageConnections'],
