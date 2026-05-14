@@ -7,6 +7,7 @@ import { HermesWebSocketStack } from '../lib/hermes-websocket-stack';
 import { HermesAppStack } from '../lib/hermes-app-stack';
 import { HermesCertStack } from '../lib/hermes-cert-stack';
 import { HermesEcrStack } from '../lib/hermes-ecr-stack';
+import { HermesGithubRoleStack } from '../lib/hermes-github-role-stack';
 import { getConfig } from '../lib/config';
 
 const app = new cdk.App();
@@ -18,6 +19,12 @@ const env = {
 };
 
 const ecrStack = new HermesEcrStack(app, 'HermesEcrStack', { env });
+
+new HermesGithubRoleStack(app, 'HermesGithubRoleStack', {
+  env,
+  ecrRepositoryName: ecrStack.appRepo.repositoryName,
+  ssmDigestParam: '/hermes/app-image-digest',
+});
 
 const authStack = new HermesAuthStack(app, 'HermesAuthStack', { env });
 
