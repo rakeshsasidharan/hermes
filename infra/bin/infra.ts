@@ -22,6 +22,7 @@ const ecrStack = new HermesEcrStack(app, 'HermesEcrStack', { env });
 
 new HermesGithubRoleStack(app, 'HermesGithubRoleStack', {
   env: { account: env.account, region: 'us-east-1' },
+  deployRegion: env.region ?? 'us-west-2',
   ecrRepositoryName: ecrStack.appRepo.repositoryName,
   ssmDigestParam: '/hermes/app-image-digest',
 });

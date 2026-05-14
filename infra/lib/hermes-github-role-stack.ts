@@ -13,6 +13,12 @@ export interface HermesGithubRoleStackProps extends cdk.StackProps {
   ecrRepositoryName: string;
   /** SSM parameter name for the image digest. */
   ssmDigestParam: string;
+  /**
+   * Region where the app stacks (Storage, App, Email, etc.) are deployed.
+   * Used for CDK bootstrap role ARNs, ECR, and SSM resource ARNs.
+   * Separate from the stack's own region since IAM is global.
+   */
+  deployRegion: string;
 }
 
 export class HermesGithubRoleStack extends cdk.Stack {
@@ -44,10 +50,10 @@ export class HermesGithubRoleStack extends cdk.Stack {
       sid: 'CdkBootstrapRoles',
       actions: ['sts:AssumeRole'],
       resources: [
-        `arn:aws:iam::${this.account}:role/cdk-${CDK_QUALIFIER}-deploy-role-${this.account}-${this.region}`,
-        `arn:aws:iam::${this.account}:role/cdk-${CDK_QUALIFIER}-file-publishing-role-${this.account}-${this.region}`,
-        `arn:aws:iam::${this.account}:role/cdk-${CDK_QUALIFIER}-image-publishing-role-${this.account}-${this.region}`,
-        `arn:aws:iam::${this.account}:role/cdk-${CDK_QUALIFIER}-lookup-role-${this.account}-${this.region}`,
+        `arn:aws:iam::${this.account}:role/cdk-${CDK_QUALIFIER}-deploy-role-${this.account}-${props.deployRegion}`,
+        `arn:aws:iam::${this.account}:role/cdk-${CDK_QUALIFIER}-file-publishing-role-${this.account}-${props.deployRegion}`,
+        `arn:aws:iam::${this.account}:role/cdk-${CDK_QUALIFIER}-image-publishing-role-${this.account}-${props.deployRegion}`,
+        `arn:aws:iam::${this.account}:role/cdk-${CDK_QUALIFIER}-lookup-role-${this.account}-${props.deployRegion}`,
       ],
     }));
 
@@ -70,7 +76,7 @@ export class HermesGithubRoleStack extends cdk.Stack {
         'ecr:GetDownloadUrlForLayer',
       ],
       resources: [
-        `arn:aws:ecr:${this.region}:${this.account}:repository/${props.ecrRepositoryName}`,
+        `arn:aws:ecr:${props.deployRegion}:${this.account}:repository/${props.ecrRepositoryName}`,
       ],
     }));
 
@@ -79,7 +85,7 @@ export class HermesGithubRoleStack extends cdk.Stack {
       sid: 'SsmDigest',
       actions: ['ssm:PutParameter', 'ssm:GetParameter'],
       resources: [
-        `arn:aws:ssm:${this.region}:${this.account}:parameter${props.ssmDigestParam}`,
+        `arn:aws:ssm:${props.deployRegion}:${this.account}:parameter${props.ssmDigestParam}`,
       ],
     }));
 
