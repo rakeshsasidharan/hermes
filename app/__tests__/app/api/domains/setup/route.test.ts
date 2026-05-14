@@ -60,9 +60,14 @@ function makeReq(body: object) {
   });
 }
 
+function mockZoneFound(domain = 'example.com', zoneId = '/hostedzone/Z123') {
+  mockR53Send.mockResolvedValueOnce({
+    HostedZones: [{ Id: zoneId, Name: `${domain}.` }],
+  });
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
-  delete process.env.HOSTED_ZONE_ID;
 });
 
 describe('POST /api/domains/setup', () => {
@@ -98,8 +103,21 @@ describe('POST /api/domains/setup', () => {
     expect(body.error).toBe('Invalid domain name');
   });
 
+  test('returns 422 when no hosted zone found for domain', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+    mockR53Send.mockResolvedValueOnce({ HostedZones: [] });
+
+    const res = await POST(makeReq({ domain: 'example.com' }));
+    const body = await res.json();
+
+    expect(res.status).toBe(422);
+    expect(body.error).toMatch(/not hosted in Route 53/);
+    expect(mockSesSend).not.toHaveBeenCalled();
+  });
+
   test('returns 409 when domain is already verified in SES', async () => {
     mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+    mockZoneFound();
     mockSesSend.mockResolvedValueOnce({
       VerificationAttributes: { 'example.com': { VerificationStatus: 'Success' } },
     });
@@ -114,17 +132,13 @@ describe('POST /api/domains/setup', () => {
   test('happy path: creates DNS records and returns pending status', async () => {
     mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
 
-    // GetIdentityVerificationAttributes — domain not yet registered
+    // Route 53 — zone found
+    mockZoneFound();
+    // SES — domain not yet registered
     mockSesSend.mockResolvedValueOnce({ VerificationAttributes: {} });
-    // VerifyDomainIdentityCommand
+    // VerifyDomainIdentityCommand + VerifyDomainDkimCommand (called in parallel)
     mockSesSend.mockResolvedValueOnce({ VerificationToken: 'token-abc' });
-    // VerifyDomainDkimCommand
     mockSesSend.mockResolvedValueOnce({ DkimTokens: ['tok1', 'tok2', 'tok3'] });
-
-    // ListHostedZonesByNameCommand
-    mockR53Send.mockResolvedValueOnce({
-      HostedZones: [{ Id: '/hostedzone/Z123', Name: 'example.com.' }],
-    });
     // ChangeResourceRecordSetsCommand
     mockR53Send.mockResolvedValueOnce({
       ChangeInfo: { Id: '/change/C456', Status: 'PENDING' },
@@ -152,40 +166,5 @@ describe('POST /api/domains/setup', () => {
     );
     expect(txtRecord.ResourceRecordSet.Name).toBe('_amazonses.example.com');
     expect(txtRecord.ResourceRecordSet.ResourceRecords[0].Value).toBe('"token-abc"');
-  });
-
-  test('uses HOSTED_ZONE_ID env var when set', async () => {
-    process.env.HOSTED_ZONE_ID = '/hostedzone/ZENV123';
-    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
-
-    mockSesSend.mockResolvedValueOnce({ VerificationAttributes: {} });
-    mockSesSend.mockResolvedValueOnce({ VerificationToken: 'token-abc' });
-    mockSesSend.mockResolvedValueOnce({ DkimTokens: ['tok1', 'tok2', 'tok3'] });
-    mockR53Send.mockResolvedValueOnce({
-      ChangeInfo: { Id: '/change/CENV', Status: 'PENDING' },
-    });
-
-    const res = await POST(makeReq({ domain: 'example.com' }));
-
-    expect(res.status).toBe(200);
-    // Route 53 should NOT have called ListHostedZonesByNameCommand
-    expect(mockR53Send).toHaveBeenCalledTimes(1);
-    const r53Call = mockR53Send.mock.calls[0][0];
-    expect(r53Call.HostedZoneId).toBe('ZENV123');
-  });
-
-  test('returns 422 when no hosted zone found for domain', async () => {
-    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
-
-    mockSesSend.mockResolvedValueOnce({ VerificationAttributes: {} });
-    mockSesSend.mockResolvedValueOnce({ VerificationToken: 'token-abc' });
-    mockSesSend.mockResolvedValueOnce({ DkimTokens: ['tok1'] });
-    mockR53Send.mockResolvedValueOnce({ HostedZones: [] });
-
-    const res = await POST(makeReq({ domain: 'example.com' }));
-    const body = await res.json();
-
-    expect(res.status).toBe(422);
-    expect(body.error).toMatch(/No Route 53 hosted zone/);
   });
 });
