@@ -2,6 +2,7 @@ import * as path from 'path';
 import * as cdk from 'aws-cdk-lib/core';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
+import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as logs from 'aws-cdk-lib/aws-logs';
@@ -35,6 +36,10 @@ export interface HermesAppStackProps extends cdk.StackProps {
   certificate?: acm.ICertificate;
   /** Route 53 hosted zone domain (e.g. rpillai.dev) for creating the A record alias and DNS onboarding. */
   hostedZoneDomainName?: string;
+  /** ECR repository holding the pre-built app image. When provided with imageDigest, uses ECR instead of building locally. */
+  appRepo?: ecr.IRepository;
+  /** Image digest (sha256:...) written by CI. When set, pins the Lambda to this exact image. */
+  imageDigest?: string;
 }
 
 export class HermesAppStack extends cdk.Stack {
@@ -109,11 +114,15 @@ export class HermesAppStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    const appCode = props.appRepo && props.imageDigest
+      ? lambda.DockerImageCode.fromEcr(props.appRepo, { tagOrDigest: props.imageDigest })
+      : lambda.DockerImageCode.fromImageAsset(path.join(__dirname, '../../app'), {
+          platform: Platform.LINUX_AMD64,
+        });
+
     const appFunction = new lambda.DockerImageFunction(this, 'AppFunction', {
       functionName: 'hermes-app',
-      code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, '../../app'), {
-        platform: Platform.LINUX_AMD64,
-      }),
+      code: appCode,
       memorySize: 512,
       timeout: cdk.Duration.seconds(30),
       architecture: lambda.Architecture.X86_64,

@@ -6,6 +6,7 @@ import { HermesEmailStack } from '../lib/hermes-email-stack';
 import { HermesWebSocketStack } from '../lib/hermes-websocket-stack';
 import { HermesAppStack } from '../lib/hermes-app-stack';
 import { HermesCertStack } from '../lib/hermes-cert-stack';
+import { HermesEcrStack } from '../lib/hermes-ecr-stack';
 import { getConfig } from '../lib/config';
 
 const app = new cdk.App();
@@ -15,6 +16,8 @@ const env = {
   account: process.env.CDK_DEFAULT_ACCOUNT,
   region: process.env.CDK_DEFAULT_REGION,
 };
+
+const ecrStack = new HermesEcrStack(app, 'HermesEcrStack', { env });
 
 const authStack = new HermesAuthStack(app, 'HermesAuthStack', { env });
 
@@ -51,6 +54,8 @@ const certStack = new HermesCertStack(app, 'HermesCertStack', {
   crossRegionReferences: true,
 });
 
+const imageDigest = app.node.tryGetContext('imageDigest') as string | undefined;
+
 new HermesAppStack(app, 'HermesAppStack', {
   env,
   crossRegionReferences: true,
@@ -67,4 +72,5 @@ new HermesAppStack(app, 'HermesAppStack', {
   domainName: config.domainName,
   certificate: certStack.certificate,
   hostedZoneDomainName: config.hostedZoneDomainName,
+  ...(imageDigest ? { appRepo: ecrStack.appRepo, imageDigest } : {}),
 });
