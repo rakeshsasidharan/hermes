@@ -7,6 +7,9 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'Hermes',
   description: 'Personal email management application',
+  icons: {
+    icon: '/icon.svg',
+  }
 };
 
 export default function RootLayout({
