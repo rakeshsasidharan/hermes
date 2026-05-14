@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useWs } from '@/components/ws-context';
 import { useCompose } from '@/components/compose-context';
 
-import { Mail, FileText, Settings, LogOut, PenSquare, Globe } from 'lucide-react';
+import { Mail, FileText, Settings, LogOut, PenSquare, Globe, AtSign } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
@@ -122,6 +122,20 @@ export function Sidebar({ addresses }: SidebarProps) {
           <Separator className="my-3" />
 
           <ul className="space-y-1">
+            <li>
+              <Link
+                href="/addresses"
+                className={cn(
+                  'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+                  pathname === '/addresses'
+                    ? 'bg-accent text-accent-foreground font-medium'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                )}
+              >
+                <AtSign className="h-4 w-4 shrink-0" />
+                Addresses
+              </Link>
+            </li>
             <li>
               <Link
                 href="/domains"
