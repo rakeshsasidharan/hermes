@@ -16,7 +16,7 @@ export function LoginForm() {
 
   useEffect(() => {
     if (state.success) {
-      router.push('/addresses');
+      router.push('/');
     }
   }, [state.success, router]);
 

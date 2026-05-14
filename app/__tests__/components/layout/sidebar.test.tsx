@@ -15,19 +15,30 @@ jest.mock('next/navigation', () => ({
 let wsHandler: ((event: WsNewMessageEvent) => void) | null = null;
 const mockSubscribe = jest.fn((handler: (event: WsNewMessageEvent) => void) => {
   wsHandler = handler;
-  return () => { wsHandler = null; };
+  return () => {
+    wsHandler = null;
+  };
 });
 
 jest.mock('@/components/ws-context', () => ({
   useWs: () => ({ subscribe: mockSubscribe }),
+}));
+
 jest.mock('@/components/compose-context', () => ({
-  useCompose: () => ({ openCompose: mockOpenCompose, closeCompose: jest.fn(), isOpen: false, initialData: null }),
+  useCompose: () => ({
+    openCompose: mockOpenCompose,
+    closeCompose: jest.fn(),
+    isOpen: false,
+    initialData: null,
+  }),
 }));
 
 jest.mock('@/components/ui/tooltip', () => ({
   TooltipProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  TooltipTrigger: ({ children }: { children: React.ReactNode; asChild?: boolean }) => <>{children}</>,
+  TooltipTrigger: ({ children }: { children: React.ReactNode; asChild?: boolean }) => (
+    <>{children}</>
+  ),
   TooltipContent: () => null,
 }));
 
@@ -66,9 +77,10 @@ describe('Sidebar', () => {
     expect(screen.getByText(/no addresses yet/i)).toBeInTheDocument();
   });
 
-  test('renders Compose, Drafts, Settings links', () => {
+  test('renders Compose, Domains, Drafts, Settings links', () => {
     render(<Sidebar addresses={ADDRESSES} />);
     expect(screen.getByText('Compose')).toBeInTheDocument();
+    expect(screen.getByText('Domains')).toBeInTheDocument();
     expect(screen.getByText('Drafts')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
   });
@@ -94,6 +106,8 @@ describe('Sidebar', () => {
     await waitFor(() => {
       expect(screen.getByText('1')).toBeInTheDocument();
     });
+  });
+
   test('Compose button opens compose sheet via context', async () => {
     const user = userEvent.setup();
     render(<Sidebar addresses={ADDRESSES} />);
