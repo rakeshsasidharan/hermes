@@ -46,15 +46,20 @@ export class HermesGithubRoleStack extends cdk.Stack {
     // ── Assume CDK bootstrap roles ─────────────────────────────────────────
     // CDK deploy delegates to these roles — the GitHub Actions role only needs
     // to assume them, not hold broad CloudFormation/IAM permissions directly.
+    // Both us-east-1 (HermesGithubRoleStack, HermesCertStack) and deployRegion
+    // (all app stacks) are needed since stacks live in two regions.
+    const bootstrapRoleArns = ['us-east-1', props.deployRegion]
+      .flatMap(region => [
+        `arn:aws:iam::${this.account}:role/cdk-${CDK_QUALIFIER}-deploy-role-${this.account}-${region}`,
+        `arn:aws:iam::${this.account}:role/cdk-${CDK_QUALIFIER}-file-publishing-role-${this.account}-${region}`,
+        `arn:aws:iam::${this.account}:role/cdk-${CDK_QUALIFIER}-image-publishing-role-${this.account}-${region}`,
+        `arn:aws:iam::${this.account}:role/cdk-${CDK_QUALIFIER}-lookup-role-${this.account}-${region}`,
+      ]);
+
     this.deployRole.addToPolicy(new iam.PolicyStatement({
       sid: 'CdkBootstrapRoles',
       actions: ['sts:AssumeRole'],
-      resources: [
-        `arn:aws:iam::${this.account}:role/cdk-${CDK_QUALIFIER}-deploy-role-${this.account}-${props.deployRegion}`,
-        `arn:aws:iam::${this.account}:role/cdk-${CDK_QUALIFIER}-file-publishing-role-${this.account}-${props.deployRegion}`,
-        `arn:aws:iam::${this.account}:role/cdk-${CDK_QUALIFIER}-image-publishing-role-${this.account}-${props.deployRegion}`,
-        `arn:aws:iam::${this.account}:role/cdk-${CDK_QUALIFIER}-lookup-role-${this.account}-${props.deployRegion}`,
-      ],
+      resources: bootstrapRoleArns,
     }));
 
     // ── ECR — docker login + image push ───────────────────────────────────
