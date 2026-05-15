@@ -33,25 +33,18 @@ interface Message {
 
 interface MessageDetailProps {
   message: Message;
+  initialHtmlBody?: string | null;
+  initialTextBody?: string | null;
   initialDraftId?: string;
   initialComposerMode?: 'reply' | 'replyAll';
 }
 
-export function MessageDetail({ message, initialDraftId, initialComposerMode }: MessageDetailProps) {
+export function MessageDetail({ message, initialHtmlBody, initialTextBody, initialDraftId, initialComposerMode }: MessageDetailProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [htmlBody, setHtmlBody] = useState<string | null>(null);
-  const [textBody, setTextBody] = useState<string | null>(null);
+  const [htmlBody, setHtmlBody] = useState<string | null>(initialHtmlBody ?? null);
+  const [textBody, setTextBody] = useState<string | null>(initialTextBody ?? null);
   const [isRead, setIsRead] = useState(message.isRead);
   const [composerMode, setComposerMode] = useState<'reply' | 'replyAll' | null>(initialComposerMode ?? null);
-
-  useEffect(() => {
-    if (message.bodyHtmlUrl) {
-      fetch(message.bodyHtmlUrl).then((r) => r.text()).then(setHtmlBody).catch(() => null);
-    }
-    if (!message.bodyHtmlUrl && message.bodyTextUrl) {
-      fetch(message.bodyTextUrl).then((r) => r.text()).then(setTextBody).catch(() => null);
-    }
-  }, [message.bodyHtmlUrl, message.bodyTextUrl]);
 
   useEffect(() => {
     if (!message.isRead) {

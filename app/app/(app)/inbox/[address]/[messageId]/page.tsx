@@ -11,13 +11,13 @@ interface Attachment {
 
 interface Message {
   messageId: string;
-  sender: string;
-  subject: string;
-  receivedAt: string;
-  isRead: boolean;
+  sender?: string;
   from?: string;
   to?: string;
   cc?: string;
+  subject: string;
+  receivedAt: string;
+  isRead: boolean;
   bodyHtmlUrl?: string;
   bodyTextUrl?: string;
   attachments?: Attachment[];
@@ -48,6 +48,15 @@ async function getMessage(id: string): Promise<Message | null> {
   return data.message ?? null;
 }
 
+async function fetchBodyFromS3(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url);
+    return res.ok ? res.text() : null;
+  } catch {
+    return null;
+  }
+}
+
 interface Props {
   params: Promise<{ address: string; messageId: string }>;
   searchParams: Promise<{ draftId?: string; mode?: string }>;
@@ -62,9 +71,16 @@ export default async function MessageDetailPage({ params, searchParams }: Props)
     notFound();
   }
 
+  // Fetch body server-side so the browser never needs to hit S3 directly
+  // (avoids S3 CORS restrictions on presigned URL fetches).
+  const htmlBody = message.bodyHtmlUrl ? await fetchBodyFromS3(message.bodyHtmlUrl) : null;
+  const textBody = !htmlBody && message.bodyTextUrl ? await fetchBodyFromS3(message.bodyTextUrl) : null;
+
   return (
     <MessageDetail
       message={message}
+      initialHtmlBody={htmlBody}
+      initialTextBody={textBody}
       initialDraftId={draftId}
       initialComposerMode={mode === 'replyAll' ? 'replyAll' : mode === 'reply' ? 'reply' : undefined}
     />
