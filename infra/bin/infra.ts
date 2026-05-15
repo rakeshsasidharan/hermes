@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib/core';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import { HermesAuthStack } from '../lib/hermes-auth-stack';
 import { HermesStorageStack } from '../lib/hermes-storage-stack';
 import { HermesEmailStack } from '../lib/hermes-email-stack';
@@ -55,18 +56,24 @@ const emailStack = new HermesEmailStack(app, 'HermesEmailStack', {
 });
 
 // ACM certificate must be in us-east-1 for CloudFront.
+// HermesCertStack manages the cert resource; we import it by ARN here to avoid
+// CDK's cross-region reference mechanism (ExportsWriter/ExportsReader), which
+// creates a fragile SSM-version-pinned dependency that breaks on stack updates.
 const certStack = new HermesCertStack(app, 'HermesCertStack', {
   env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: 'us-east-1' },
   domainName: config.domainName,
   hostedZoneDomainName: config.hostedZoneDomainName,
-  crossRegionReferences: true,
 });
+
+// Import the cert by ARN (stored in cdk.context.json as certArn).
+// This avoids CDK cross-region token resolution and the ExportsReader in HermesAppStack.
+const certArn = app.node.getContext('certArn') as string;
+const certificate = acm.Certificate.fromCertificateArn(certStack, 'ImportedCert', certArn);
 
 const imageDigest = app.node.tryGetContext('imageDigest') as string | undefined;
 
 new HermesAppStack(app, 'HermesAppStack', {
   env,
-  crossRegionReferences: true,
   emailBucket: storageStack.emailBucket,
   addressesTable: storageStack.addressesTable,
   messagesTable: storageStack.messagesTable,
@@ -78,7 +85,7 @@ new HermesAppStack(app, 'HermesAppStack', {
   userPool: authStack.userPool,
   userPoolClient: authStack.userPoolClient,
   domainName: config.domainName,
-  certificate: certStack.certificate,
+  certificate,
   hostedZoneDomainName: config.hostedZoneDomainName,
   ...(imageDigest ? { appRepo: ecrStack.appRepo, imageDigest } : {}),
 });

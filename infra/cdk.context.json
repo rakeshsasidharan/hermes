@@ -1,6 +1,7 @@
 {
   "domainName": "hermes.rpillai.dev",
   "hostedZoneDomainName": "rpillai.dev",
+  "certArn": "arn:aws:acm:us-east-1:380295607300:certificate/0d44daf0-f42d-48d1-b331-f178aaf80951",
 
   "hosted-zone:account=380295607300:domainName=rpillai.dev:region=us-east-1": {
     "Id": "/hostedzone/Z09448923GM8JYHLHFY03",
