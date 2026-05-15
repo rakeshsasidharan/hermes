@@ -15,7 +15,7 @@ interface Message {
   attachments?: { filename: string; s3Key: string }[];
 }
 
-async function getMessages(address: string, direction: 'inbound' | 'outbound') {
+async function getMessages(address: string) {
   const cookieStore = await cookies();
   const token = cookieStore.get('access_token')?.value;
 
@@ -24,7 +24,7 @@ async function getMessages(address: string, direction: 'inbound' | 'outbound') {
   }
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
-  const params = new URLSearchParams({ address, direction });
+  const params = new URLSearchParams({ address, direction: 'outbound' });
   const res = await fetch(`${baseUrl}/api/messages?${params.toString()}`, {
     headers: { Cookie: `access_token=${token}` },
     cache: 'no-store',
@@ -43,21 +43,21 @@ interface Props {
   params: Promise<{ address: string }>;
 }
 
-export default async function InboxPage({ params }: Props) {
+export default async function SentPage({ params }: Props) {
   const { address } = await params;
   const decodedAddress = decodeURIComponent(address);
 
-  const { messages, nextCursor } = await getMessages(decodedAddress, 'inbound');
+  const { messages, nextCursor } = await getMessages(decodedAddress);
 
   return (
     <div className="space-y-4">
       <div>
         <p className="text-xs text-muted-foreground">{decodedAddress}</p>
-        <h2 className="text-lg font-semibold">Inbox</h2>
+        <h2 className="text-lg font-semibold">Sent</h2>
       </div>
       <MessageList
         address={decodedAddress}
-        direction="inbound"
+        direction="outbound"
         initialMessages={messages}
         initialNextCursor={nextCursor}
       />

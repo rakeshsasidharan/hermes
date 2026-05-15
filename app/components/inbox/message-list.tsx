@@ -38,13 +38,14 @@ interface Message {
 
 interface MessageListProps {
   address: string;
+  direction: 'inbound' | 'outbound';
   initialMessages: Message[];
   initialNextCursor: string | null;
 }
 
 const EMPTY_FILTERS: Filters = { sender: '', subject: '', from: '', to: '' };
 
-export function MessageList({ address, initialMessages, initialNextCursor }: MessageListProps) {
+export function MessageList({ address, direction, initialMessages, initialNextCursor }: MessageListProps) {
   const router = useRouter();
   const { subscribe } = useWs();
   const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -53,6 +54,7 @@ export function MessageList({ address, initialMessages, initialNextCursor }: Mes
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    if (direction !== 'inbound') return;
     return subscribe((event) => {
       if (event.address !== address) return;
       setMessages((prev) => {
@@ -60,12 +62,12 @@ export function MessageList({ address, initialMessages, initialNextCursor }: Mes
         return [event.message, ...prev];
       });
     });
-  }, [subscribe, address]);
+  }, [subscribe, address, direction]);
 
   async function fetchMessages(cursor?: string, newFilters?: Filters) {
     setIsLoading(true);
     const active = newFilters ?? filters;
-    const params = new URLSearchParams({ address });
+    const params = new URLSearchParams({ address, direction });
     if (active.sender) params.set('sender', active.sender);
     if (active.subject) params.set('subject', active.subject);
     if (active.from) params.set('from', active.from);
@@ -97,8 +99,11 @@ export function MessageList({ address, initialMessages, initialNextCursor }: Mes
   }
 
   function handleRowClick(msg: Message) {
-    router.push(`/inbox/${encodeURIComponent(address)}/${msg.messageId}`);
+    const root = direction === 'outbound' ? 'sent' : 'inbox';
+    router.push(`/${root}/${encodeURIComponent(address)}/${msg.messageId}`);
   }
+
+  const isSent = direction === 'outbound';
 
   return (
     <div className="space-y-4">
@@ -108,7 +113,7 @@ export function MessageList({ address, initialMessages, initialNextCursor }: Mes
         <TableHeader>
           <TableRow>
             <TableHead className="w-8"></TableHead>
-            <TableHead>From / To</TableHead>
+            <TableHead>{isSent ? 'To' : 'From'}</TableHead>
             <TableHead>Subject</TableHead>
             <TableHead className="text-right">Date</TableHead>
           </TableRow>
@@ -130,14 +135,12 @@ export function MessageList({ address, initialMessages, initialNextCursor }: Mes
               </TableCell>
             </TableRow>
           ) : (
-            messages.map((msg) => {
-              const isOutbound = msg.direction === 'outbound';
-              return (
+            messages.map((msg) => (
               <TableRow
                 key={msg.messageId}
                 className={cn(
                   'cursor-pointer hover:bg-accent',
-                  !msg.isRead && !isOutbound && 'bg-accent/30 font-medium',
+                  !isSent && !msg.isRead && 'bg-accent/30 font-medium',
                 )}
                 onClick={() => handleRowClick(msg)}
               >
@@ -148,17 +151,12 @@ export function MessageList({ address, initialMessages, initialNextCursor }: Mes
                 </TableCell>
                 <TableCell className="py-2">
                   <div className="flex items-center gap-2">
-                    {!msg.isRead && !isOutbound && (
+                    {!isSent && !msg.isRead && (
                       <Badge variant="default" className="h-4 w-4 shrink-0 rounded-full p-0" aria-label="Unread" />
                     )}
-                    {isOutbound ? (
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <Badge variant="secondary" className="text-xs shrink-0">Sent</Badge>
-                        <span className="truncate max-w-45 text-muted-foreground">{msg.to}</span>
-                      </div>
-                    ) : (
-                      <span className="truncate max-w-45">{msg.sender}</span>
-                    )}
+                    <span className="truncate max-w-45">
+                      {isSent ? (msg.to ?? '') : (msg.from ?? msg.sender ?? '')}
+                    </span>
                   </div>
                 </TableCell>
                 <TableCell className="py-2 truncate max-w-xs">{msg.subject}</TableCell>
@@ -166,8 +164,7 @@ export function MessageList({ address, initialMessages, initialNextCursor }: Mes
                   {new Date(msg.receivedAt).toLocaleDateString()}
                 </TableCell>
               </TableRow>
-              );
-            })
+            ))
           )}
         </TableBody>
       </Table>

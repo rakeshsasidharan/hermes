@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, QueryCommand, PutCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { SESClient, SendRawEmailCommand } from '@aws-sdk/client-ses';
 import { requireAuth, AuthError } from '@/lib/auth/require-auth';
 import nodemailer from 'nodemailer';
@@ -52,12 +52,19 @@ export async function GET(req: NextRequest) {
   const subject = searchParams.get('subject');
   const from = searchParams.get('from');
   const to = searchParams.get('to');
+  const direction = searchParams.get('direction');
 
   const filterConditions: string[] = [];
   const expressionAttributeNames: Record<string, string> = {};
   const expressionAttributeValues: Record<string, unknown> = {
     ':address': address,
   };
+
+  if (direction) {
+    filterConditions.push('#direction = :direction');
+    expressionAttributeNames['#direction'] = 'direction';
+    expressionAttributeValues[':direction'] = direction;
+  }
 
   if (sender) {
     filterConditions.push('contains(#sender, :sender)');
@@ -166,6 +173,15 @@ export async function POST(req: NextRequest) {
 
   const messageId = crypto.randomUUID();
   const sentAt = new Date().toISOString();
+
+  const bodyS3Key = `sent/${messageId}/body.txt`;
+  await getS3().send(new PutObjectCommand({
+    Bucket: process.env.S3_BUCKET!,
+    Key: bodyS3Key,
+    Body: (emailBody as string) ?? '',
+    ContentType: 'text/plain',
+  }));
+
   const dynamo = getDynamo();
 
   await dynamo.send(new PutCommand({
@@ -182,6 +198,7 @@ export async function POST(req: NextRequest) {
       receivedAt: sentAt,
       status: 'sent',
       isRead: true,
+      bodyTextS3Key: bodyS3Key,
       ...(Array.isArray(attachmentKeys) && attachmentKeys.length > 0
         ? {
             attachments: (attachmentKeys as string[]).map((key) => ({

@@ -62,7 +62,7 @@ interface Props {
   searchParams: Promise<{ draftId?: string; mode?: string }>;
 }
 
-export default async function MessageDetailPage({ params, searchParams }: Props) {
+export default async function SentMessageDetailPage({ params, searchParams }: Props) {
   const { messageId } = await params;
   const { draftId, mode } = await searchParams;
   const message = await getMessage(messageId);
@@ -71,8 +71,6 @@ export default async function MessageDetailPage({ params, searchParams }: Props)
     notFound();
   }
 
-  // Fetch body server-side so the browser never needs to hit S3 directly
-  // (avoids S3 CORS restrictions on presigned URL fetches).
   const htmlBody = message.bodyHtmlUrl ? await fetchBodyFromS3(message.bodyHtmlUrl) : null;
   const textBody = !htmlBody && message.bodyTextUrl ? await fetchBodyFromS3(message.bodyTextUrl) : null;
 

@@ -37,37 +37,19 @@ describe('MessageDetail', () => {
     expect(screen.getByText(/no message body/i)).toBeInTheDocument();
   });
 
-  test('renders sandboxed iframe when bodyHtmlUrl is provided', async () => {
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url === 'https://s3.example.com/html') {
-        return Promise.resolve({ ok: true, text: async () => '<p>HTML body</p>' });
-      }
-      return Promise.resolve({ ok: true, json: async () => ({}) });
-    });
-
-    render(<MessageDetail message={{ ...BASE_MSG, bodyHtmlUrl: 'https://s3.example.com/html' }} />);
+  test('renders sandboxed iframe when initialHtmlBody is provided', async () => {
+    render(<MessageDetail message={BASE_MSG} initialHtmlBody="<p>HTML body</p>" />);
 
     await waitFor(() => {
       const iframe = screen.getByTestId('html-body-frame');
       expect(iframe).toBeInTheDocument();
       expect(iframe).toHaveAttribute('sandbox', 'allow-same-origin');
     });
-    expect(global.fetch).toHaveBeenCalledWith('https://s3.example.com/html');
   });
 
-  test('renders plain text body when bodyTextUrl is provided', async () => {
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url === 'https://s3.example.com/text') {
-        return Promise.resolve({ ok: true, text: async () => 'Plain text body content' });
-      }
-      return Promise.resolve({ ok: true, json: async () => ({}) });
-    });
-
-    render(<MessageDetail message={{ ...BASE_MSG, bodyTextUrl: 'https://s3.example.com/text' }} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('text-body')).toHaveTextContent('Plain text body content');
-    });
+  test('renders plain text body when initialTextBody is provided', () => {
+    render(<MessageDetail message={BASE_MSG} initialTextBody="Plain text body content" />);
+    expect(screen.getByTestId('text-body')).toHaveTextContent('Plain text body content');
   });
 
   test('marks message as read on mount when unread', async () => {

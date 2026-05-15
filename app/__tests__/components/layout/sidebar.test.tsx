@@ -99,6 +99,45 @@ describe('Sidebar', () => {
     expect(link.className).toContain('bg-accent');
   });
 
+  test('renders Inbox and Sent sub-nav for each address', () => {
+    render(<Sidebar addresses={ADDRESSES} />);
+    expect(screen.getAllByText('Inbox')).toHaveLength(ADDRESSES.length);
+    expect(screen.getAllByText('Sent')).toHaveLength(ADDRESSES.length);
+  });
+
+  test('Inbox sub-link points to /inbox/[address]', () => {
+    render(<Sidebar addresses={ADDRESSES} />);
+    const inboxLinks = screen.getAllByRole('link', { name: /^inbox$/i });
+    expect(inboxLinks[0]).toHaveAttribute('href', '/inbox/hello%40example.com');
+  });
+
+  test('Sent sub-link points to /sent/[address]', () => {
+    render(<Sidebar addresses={ADDRESSES} />);
+    const sentLinks = screen.getAllByRole('link', { name: /^sent$/i });
+    expect(sentLinks[0]).toHaveAttribute('href', '/sent/hello%40example.com');
+  });
+
+  test('Inbox sub-link has active style when on inbox route', () => {
+    mockPathname.mockReturnValue('/inbox/hello%40example.com');
+    render(<Sidebar addresses={ADDRESSES} />);
+    const inboxLinks = screen.getAllByRole('link', { name: /^inbox$/i });
+    expect(inboxLinks[0].className).toContain('bg-accent');
+  });
+
+  test('Sent sub-link has active style when on sent route', () => {
+    mockPathname.mockReturnValue('/sent/hello%40example.com');
+    render(<Sidebar addresses={ADDRESSES} />);
+    const sentLinks = screen.getAllByRole('link', { name: /^sent$/i });
+    expect(sentLinks[0].className).toContain('bg-accent');
+  });
+
+  test('Sent sub-link stays active when viewing a sent message detail', () => {
+    mockPathname.mockReturnValue('/sent/hello%40example.com/msg-123');
+    render(<Sidebar addresses={ADDRESSES} />);
+    const sentLinks = screen.getAllByRole('link', { name: /^sent$/i });
+    expect(sentLinks[0].className).toContain('bg-accent');
+  });
+
   test('increments unread badge when WebSocket new_message event arrives', async () => {
     render(<Sidebar addresses={ADDRESSES} />);
 

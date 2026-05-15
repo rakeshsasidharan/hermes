@@ -50,7 +50,7 @@ async function fetchRecentMessages(
 
   const perAddress = await Promise.all(
     addresses.map(async (addr) => {
-      const url = `${BASE}/api/messages?address=${encodeURIComponent(addr.email)}&limit=5`;
+      const url = `${BASE}/api/messages?address=${encodeURIComponent(addr.email)}&direction=inbound&limit=5`;
       const res = await fetch(url, {
         headers: { Cookie: cookieHeader },
         cache: 'no-store',
