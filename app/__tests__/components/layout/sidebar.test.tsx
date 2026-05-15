@@ -77,12 +77,26 @@ describe('Sidebar', () => {
     expect(screen.getByText(/no addresses yet/i)).toBeInTheDocument();
   });
 
-  test('renders Compose, Domains, Drafts, Settings links', () => {
+  test('renders Compose, Addresses, Domains, Drafts, Settings links', () => {
     render(<Sidebar addresses={ADDRESSES} />);
     expect(screen.getByText('Compose')).toBeInTheDocument();
+    expect(screen.getByText('Addresses')).toBeInTheDocument();
     expect(screen.getByText('Domains')).toBeInTheDocument();
     expect(screen.getByText('Drafts')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
+  });
+
+  test('Addresses link points to /addresses', () => {
+    render(<Sidebar addresses={ADDRESSES} />);
+    const link = screen.getByRole('link', { name: /^addresses$/i });
+    expect(link).toHaveAttribute('href', '/addresses');
+  });
+
+  test('Addresses link has active style when pathname is /addresses', () => {
+    mockPathname.mockReturnValue('/addresses');
+    render(<Sidebar addresses={ADDRESSES} />);
+    const link = screen.getByRole('link', { name: /^addresses$/i });
+    expect(link.className).toContain('bg-accent');
   });
 
   test('increments unread badge when WebSocket new_message event arrives', async () => {
