@@ -5,7 +5,10 @@ import { MessageList } from '@/components/inbox/message-list';
 interface Message {
   messageId: string;
   address: string;
-  sender: string;
+  sender?: string;
+  from?: string;
+  to?: string;
+  direction?: 'inbound' | 'outbound';
   subject: string;
   receivedAt: string;
   isRead: boolean;

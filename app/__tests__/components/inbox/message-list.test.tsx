@@ -30,6 +30,7 @@ const MESSAGES = [
     messageId: 'msg-1',
     address: 'hello@example.com',
     sender: 'alice@test.com',
+    direction: 'inbound' as const,
     subject: 'Hello',
     receivedAt: '2026-01-01T10:00:00Z',
     isRead: true,
@@ -39,12 +40,25 @@ const MESSAGES = [
     messageId: 'msg-2',
     address: 'hello@example.com',
     sender: 'bob@test.com',
+    direction: 'inbound' as const,
     subject: 'World',
     receivedAt: '2026-01-02T10:00:00Z',
     isRead: false,
     attachments: [{ filename: 'file.pdf', s3Key: 'key' }],
   },
 ];
+
+const OUTBOUND_MESSAGE = {
+  messageId: 'msg-out',
+  address: 'hello@example.com',
+  from: 'hello@example.com',
+  to: 'recipient@test.com',
+  direction: 'outbound' as const,
+  subject: 'Re: Hello',
+  receivedAt: '2026-01-03T10:00:00Z',
+  isRead: true,
+  attachments: [],
+};
 
 beforeEach(() => {
   global.fetch = jest.fn();
@@ -174,6 +188,19 @@ describe('MessageList', () => {
     });
 
     expect(screen.getAllByText('alice@test.com')).toHaveLength(1);
+  });
+
+  test('shows Sent badge and recipient for outbound messages', () => {
+    render(<MessageList address="hello@example.com" initialMessages={[OUTBOUND_MESSAGE]} initialNextCursor={null} />);
+    expect(screen.getByText('Sent')).toBeInTheDocument();
+    expect(screen.getByText('recipient@test.com')).toBeInTheDocument();
+    expect(screen.getByText('Re: Hello')).toBeInTheDocument();
+  });
+
+  test('does not show unread badge for outbound messages', () => {
+    const unreadOutbound = { ...OUTBOUND_MESSAGE, isRead: false };
+    render(<MessageList address="hello@example.com" initialMessages={[unreadOutbound]} initialNextCursor={null} />);
+    expect(screen.queryByLabelText('Unread')).not.toBeInTheDocument();
   });
 
   test('navigates to message detail on row click', async () => {
