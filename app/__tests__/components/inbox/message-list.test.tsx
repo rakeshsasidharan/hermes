@@ -208,26 +208,23 @@ describe('MessageList — shared', () => {
     expect(screen.queryByRole('button', { name: /load more/i })).not.toBeInTheDocument();
   });
 
-  test('shows Sent badge and recipient for outbound messages', () => {
-    render(<MessageList address="hello@example.com" initialMessages={[OUTBOUND_MESSAGE]} initialNextCursor={null} />);
-    expect(screen.getByText('Sent')).toBeInTheDocument();
-    expect(screen.getByText('recipient@test.com')).toBeInTheDocument();
-    expect(screen.getByText('Re: Hello')).toBeInTheDocument();
-  });
-
-  test('does not show unread badge for outbound messages', () => {
-    const unreadOutbound = { ...OUTBOUND_MESSAGE, isRead: false };
-    render(<MessageList address="hello@example.com" initialMessages={[unreadOutbound]} initialNextCursor={null} />);
-    expect(screen.queryByLabelText('Unread')).not.toBeInTheDocument();
-  });
-
-  test('navigates to message detail on row click', async () => {
+  test('navigates to /inbox/[address]/[messageId] for inbound', async () => {
     const { useRouter } = require('next/navigation');
     const mockPush = jest.fn();
     useRouter.mockReturnValue({ push: mockPush });
     const user = userEvent.setup();
     render(<MessageList address="hello@example.com" direction="inbound" initialMessages={INBOUND_MESSAGES} initialNextCursor={null} />);
     await user.click(screen.getByText('Hello'));
-    expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('msg-1'));
+    expect(mockPush).toHaveBeenCalledWith('/inbox/hello%40example.com/msg-1');
+  });
+
+  test('navigates to /sent/[address]/[messageId] for outbound', async () => {
+    const { useRouter } = require('next/navigation');
+    const mockPush = jest.fn();
+    useRouter.mockReturnValue({ push: mockPush });
+    const user = userEvent.setup();
+    render(<MessageList address="hello@example.com" direction="outbound" initialMessages={OUTBOUND_MESSAGES} initialNextCursor={null} />);
+    await user.click(screen.getByText('Re: Hello'));
+    expect(mockPush).toHaveBeenCalledWith('/sent/hello%40example.com/msg-out');
   });
 });

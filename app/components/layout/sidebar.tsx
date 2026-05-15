@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,6 @@ interface SidebarProps {
 
 export function Sidebar({ addresses }: SidebarProps) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const router = useRouter();
   const { subscribe } = useWs();
 
@@ -85,11 +84,11 @@ export function Sidebar({ addresses }: SidebarProps) {
           </p>
           <ul className="space-y-1">
             {addresses.map((addr) => {
-              const baseHref = `/inbox/${encodeURIComponent(addr.email)}`;
-              const isAddressActive = pathname.startsWith(baseHref);
-              const currentView = searchParams.get('view');
-              const inboxActive = isAddressActive && currentView !== 'sent';
-              const sentActive = isAddressActive && currentView === 'sent';
+              const inboxHref = `/inbox/${encodeURIComponent(addr.email)}`;
+              const sentHref = `/sent/${encodeURIComponent(addr.email)}`;
+              const inboxActive = pathname.startsWith(inboxHref);
+              const sentActive = pathname.startsWith(sentHref);
+              const isAddressActive = inboxActive || sentActive;
               const count = unreadCounts.get(addr.email) ?? 0;
               return (
                 <li key={addr.email}>
@@ -117,7 +116,7 @@ export function Sidebar({ addresses }: SidebarProps) {
                   <ul className="ml-6 mt-0.5 space-y-0.5">
                     <li>
                       <Link
-                        href={baseHref}
+                        href={inboxHref}
                         className={cn(
                           'flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors',
                           inboxActive
@@ -131,7 +130,7 @@ export function Sidebar({ addresses }: SidebarProps) {
                     </li>
                     <li>
                       <Link
-                        href={`${baseHref}?view=sent`}
+                        href={sentHref}
                         className={cn(
                           'flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors',
                           sentActive

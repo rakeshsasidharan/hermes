@@ -5,13 +5,11 @@ import type { WsNewMessageEvent } from '@/lib/ws';
 
 const mockPush = jest.fn();
 const mockPathname = jest.fn().mockReturnValue('/');
-const mockSearchParams = { get: jest.fn().mockReturnValue(null) };
 const mockOpenCompose = jest.fn();
 
 jest.mock('next/navigation', () => ({
   usePathname: () => mockPathname(),
   useRouter: () => ({ push: mockPush }),
-  useSearchParams: () => mockSearchParams,
 }));
 
 let wsHandler: ((event: WsNewMessageEvent) => void) | null = null;
@@ -52,7 +50,6 @@ const ADDRESSES = [
 beforeEach(() => {
   global.fetch = jest.fn();
   mockPathname.mockReturnValue('/');
-  mockSearchParams.get.mockReturnValue(null);
   mockPush.mockReset();
   wsHandler = null;
   mockSubscribe.mockClear();

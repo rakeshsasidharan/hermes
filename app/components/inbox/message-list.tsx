@@ -99,7 +99,8 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
   }
 
   function handleRowClick(msg: Message) {
-    router.push(`/inbox/${encodeURIComponent(address)}/${msg.messageId}`);
+    const root = direction === 'outbound' ? 'sent' : 'inbox';
+    router.push(`/${root}/${encodeURIComponent(address)}/${msg.messageId}`);
   }
 
   const isSent = direction === 'outbound';
