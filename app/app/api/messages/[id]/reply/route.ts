@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, PutCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { SESClient, SendRawEmailCommand } from '@aws-sdk/client-ses';
 import { requireAuth, AuthError } from '@/lib/auth/require-auth';
 import nodemailer from 'nodemailer';
@@ -103,6 +103,14 @@ export async function POST(
   const messageId = crypto.randomUUID();
   const sentAt = new Date().toISOString();
 
+  const bodyS3Key = `sent/${messageId}/body.txt`;
+  await s3.send(new PutObjectCommand({
+    Bucket: process.env.S3_BUCKET!,
+    Key: bodyS3Key,
+    Body: (emailBody as string) ?? '',
+    ContentType: 'text/plain',
+  }));
+
   await dynamo.send(new PutCommand({
     TableName: process.env.MESSAGES_TABLE!,
     Item: {
@@ -118,6 +126,7 @@ export async function POST(
       inReplyTo: originalMessageId,
       status: 'sent',
       isRead: true,
+      bodyTextS3Key: bodyS3Key,
       ...(Array.isArray(attachmentKeys) && attachmentKeys.length > 0
         ? {
             attachments: (attachmentKeys as string[]).map((key) => ({

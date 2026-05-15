@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useWs } from '@/components/ws-context';
 import { useCompose } from '@/components/compose-context';
 
-import { Mail, FileText, Settings, LogOut, PenSquare, Globe, AtSign } from 'lucide-react';
+import { Mail, FileText, Settings, LogOut, PenSquare, Globe, AtSign, Inbox, Send } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
@@ -27,6 +27,7 @@ interface SidebarProps {
 
 export function Sidebar({ addresses }: SidebarProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { subscribe } = useWs();
 
@@ -84,20 +85,22 @@ export function Sidebar({ addresses }: SidebarProps) {
           </p>
           <ul className="space-y-1">
             {addresses.map((addr) => {
-              const href = `/inbox/${encodeURIComponent(addr.email)}`;
-              const active = pathname.startsWith(href);
+              const baseHref = `/inbox/${encodeURIComponent(addr.email)}`;
+              const isAddressActive = pathname.startsWith(baseHref);
+              const currentView = searchParams.get('view');
+              const inboxActive = isAddressActive && currentView !== 'sent';
+              const sentActive = isAddressActive && currentView === 'sent';
               const count = unreadCounts.get(addr.email) ?? 0;
               return (
                 <li key={addr.email}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Link
-                        href={href}
+                      <div
                         className={cn(
-                          'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
-                          active
-                            ? 'bg-accent text-accent-foreground font-medium'
-                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                          'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm',
+                          isAddressActive
+                            ? 'text-accent-foreground font-medium'
+                            : 'text-muted-foreground',
                         )}
                       >
                         <Mail className="h-4 w-4 shrink-0" />
@@ -107,10 +110,40 @@ export function Sidebar({ addresses }: SidebarProps) {
                             {count}
                           </Badge>
                         ) : null}
-                      </Link>
+                      </div>
                     </TooltipTrigger>
                     <TooltipContent side="right">{addr.email}</TooltipContent>
                   </Tooltip>
+                  <ul className="ml-6 mt-0.5 space-y-0.5">
+                    <li>
+                      <Link
+                        href={baseHref}
+                        className={cn(
+                          'flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors',
+                          inboxActive
+                            ? 'bg-accent text-accent-foreground font-medium'
+                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                        )}
+                      >
+                        <Inbox className="h-3.5 w-3.5 shrink-0" />
+                        Inbox
+                      </Link>
+                    </li>
+                    <li>
+                      <Link
+                        href={`${baseHref}?view=sent`}
+                        className={cn(
+                          'flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors',
+                          sentActive
+                            ? 'bg-accent text-accent-foreground font-medium'
+                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                        )}
+                      >
+                        <Send className="h-3.5 w-3.5 shrink-0" />
+                        Sent
+                      </Link>
+                    </li>
+                  </ul>
                 </li>
               );
             })}
