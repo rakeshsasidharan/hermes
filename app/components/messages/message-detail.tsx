@@ -18,7 +18,7 @@ interface Attachment {
 
 interface Message {
   messageId: string;
-  sender: string;
+  sender?: string;
   subject: string;
   receivedAt: string;
   isRead: boolean;

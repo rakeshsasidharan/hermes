@@ -4,7 +4,7 @@ export interface WsNewMessageEvent {
   message: {
     messageId: string;
     address: string;
-    sender: string;
+    sender?: string;
     subject: string;
     receivedAt: string;
     isRead: boolean;
