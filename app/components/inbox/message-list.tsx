@@ -26,7 +26,10 @@ interface Attachment {
 interface Message {
   messageId: string;
   address: string;
-  sender: string;
+  sender?: string;
+  from?: string;
+  to?: string;
+  direction?: 'inbound' | 'outbound';
   subject: string;
   receivedAt: string;
   isRead: boolean;
@@ -105,7 +108,7 @@ export function MessageList({ address, initialMessages, initialNextCursor }: Mes
         <TableHeader>
           <TableRow>
             <TableHead className="w-8"></TableHead>
-            <TableHead>From</TableHead>
+            <TableHead>From / To</TableHead>
             <TableHead>Subject</TableHead>
             <TableHead className="text-right">Date</TableHead>
           </TableRow>
@@ -127,12 +130,14 @@ export function MessageList({ address, initialMessages, initialNextCursor }: Mes
               </TableCell>
             </TableRow>
           ) : (
-            messages.map((msg) => (
+            messages.map((msg) => {
+              const isOutbound = msg.direction === 'outbound';
+              return (
               <TableRow
                 key={msg.messageId}
                 className={cn(
                   'cursor-pointer hover:bg-accent',
-                  !msg.isRead && 'bg-accent/30 font-medium',
+                  !msg.isRead && !isOutbound && 'bg-accent/30 font-medium',
                 )}
                 onClick={() => handleRowClick(msg)}
               >
@@ -143,10 +148,17 @@ export function MessageList({ address, initialMessages, initialNextCursor }: Mes
                 </TableCell>
                 <TableCell className="py-2">
                   <div className="flex items-center gap-2">
-                    {!msg.isRead && (
+                    {!msg.isRead && !isOutbound && (
                       <Badge variant="default" className="h-4 w-4 shrink-0 rounded-full p-0" aria-label="Unread" />
                     )}
-                    <span className="truncate max-w-45">{msg.sender}</span>
+                    {isOutbound ? (
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Badge variant="secondary" className="text-xs shrink-0">Sent</Badge>
+                        <span className="truncate max-w-45 text-muted-foreground">{msg.to}</span>
+                      </div>
+                    ) : (
+                      <span className="truncate max-w-45">{msg.sender}</span>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell className="py-2 truncate max-w-xs">{msg.subject}</TableCell>
@@ -154,7 +166,8 @@ export function MessageList({ address, initialMessages, initialNextCursor }: Mes
                   {new Date(msg.receivedAt).toLocaleDateString()}
                 </TableCell>
               </TableRow>
-            ))
+              );
+            })
           )}
         </TableBody>
       </Table>
