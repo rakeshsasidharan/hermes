@@ -9,6 +9,7 @@ import * as eventTargets from 'aws-cdk-lib/aws-events-targets';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as cr from 'aws-cdk-lib/custom-resources';
 import * as path from 'path';
+import { execSync } from 'child_process';
 import { Construct } from 'constructs';
 
 const HERMES_TAG = { key: 'Project', value: 'hermes' };
@@ -73,11 +74,35 @@ export class HermesEmailStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    const lambdaDir = path.join(__dirname, '../lambda/inbound-email-processor');
     this.inboundEmailProcessor = new lambda.Function(this, 'InboundEmailProcessor', {
       functionName: 'hermes-inbound-email-processor',
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../lambda/inbound-email-processor')),
+      code: lambda.Code.fromAsset(lambdaDir, {
+        bundling: {
+          local: {
+            tryBundle(outputDir: string): boolean {
+              try {
+                execSync(
+                  `cp "${lambdaDir}/index.js" "${lambdaDir}/package.json" "${lambdaDir}/package-lock.json" "${outputDir}/"`,
+                  { stdio: 'pipe' },
+                );
+                execSync('npm ci --production', { cwd: outputDir, stdio: 'pipe' });
+                return true;
+              } catch {
+                return false;
+              }
+            },
+          },
+          image: lambda.Runtime.NODEJS_20_X.bundlingImage,
+          command: [
+            'bash',
+            '-c',
+            'cp /asset-input/index.js /asset-input/package.json /asset-input/package-lock.json /asset-output/ && cd /asset-output && npm ci --production',
+          ],
+        },
+      }),
       logGroup: processorLogGroup,
       environment: {
         MESSAGES_TABLE: props.messagesTable.tableName,
