@@ -160,7 +160,7 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
                     {!isSent && !msg.isRead && (
                       <Badge variant="default" className="h-4 w-4 shrink-0 rounded-full p-0" aria-label="Unread" />
                     )}
-                    <span className="truncate max-w-48">
+                    <span className={isSent ? 'truncate max-w-xs' : 'truncate max-w-48'}>
                       {isSent
                         ? extractDisplayName(msg.to ?? '')
                         : extractDisplayName(msg.from ?? msg.sender ?? '')}
