@@ -43,8 +43,9 @@ interface MessageDetailProps {
 
 export function MessageDetail({ message, initialHtmlBody, initialTextBody, initialDraftId, initialComposerMode }: MessageDetailProps) {
   const pathname = usePathname();
+  const isSent = pathname.startsWith('/sent');
   const backHref = pathname.split('/').slice(0, -1).join('/') || '/';
-  const backLabel = pathname.startsWith('/sent') ? 'Back to Sent' : 'Back to Inbox';
+  const backLabel = isSent ? 'Back to Sent' : 'Back to Inbox';
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
@@ -198,7 +199,8 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
           <ReplyComposer
             message={message}
             replyAll={composerMode === 'replyAll'}
-            currentAddress={message.address ?? message.to ?? ''}
+            isSent={isSent}
+            currentAddress={message.address ?? (isSent ? message.from : message.to) ?? ''}
             quotedBody={textBody}
             initialDraftId={initialDraftId}
             onClose={() => setComposerMode(null)}
