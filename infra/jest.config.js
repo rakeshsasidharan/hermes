@@ -9,5 +9,6 @@ module.exports = {
   moduleNameMapper: {
     '^@aws-sdk/(.*)$': '<rootDir>/node_modules/@aws-sdk/$1',
     '^mailparser$': '<rootDir>/node_modules/mailparser',
+    '^jose$': '<rootDir>/node_modules/jose',
   },
 };
