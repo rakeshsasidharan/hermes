@@ -64,9 +64,9 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
     });
   }, [subscribe, address, direction]);
 
-  async function fetchMessages(cursor?: string, newFilters?: Filters) {
+  const fetchMessages = useCallback(async (cursor?: string, activeFilters?: Filters) => {
     setIsLoading(true);
-    const active = newFilters ?? filters;
+    const active = activeFilters ?? filters;
     const params = new URLSearchParams({ address, direction });
     if (active.sender) params.set('sender', active.sender);
     if (active.subject) params.set('subject', active.subject);
@@ -87,12 +87,12 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [address, direction, filters]);
 
   const handleFilter = useCallback((newFilters: Filters) => {
     setFilters(newFilters);
     fetchMessages(undefined, newFilters);
-  }, []);
+  }, [fetchMessages]);
 
   function handleLoadMore() {
     if (nextCursor) fetchMessages(nextCursor);
@@ -115,7 +115,7 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
     <div className="space-y-4">
       <FilterBar onFilter={handleFilter} />
 
-      <Table>
+      <Table className={isLoading ? 'opacity-50 pointer-events-none' : ''}>
         <TableHeader>
           <TableRow>
             <TableHead className="w-8"></TableHead>
