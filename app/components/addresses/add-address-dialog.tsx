@@ -21,9 +21,16 @@ import {
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
+interface NewAddress {
+  email: string;
+  domain: string;
+  status: string;
+  createdAt: string;
+}
+
 interface AddAddressDialogProps {
   domains: string[];
-  onSuccess: () => void;
+  onSuccess: (address: NewAddress) => void;
 }
 
 export function AddAddressDialog({ domains, onSuccess }: AddAddressDialogProps) {
@@ -49,10 +56,11 @@ export function AddAddressDialog({ domains, onSuccess }: AddAddressDialogProps) 
         body: JSON.stringify({ email }),
       });
       if (res.ok) {
+        const data = await res.json();
         setLocalPart('');
         setDomain('');
         setOpen(false);
-        onSuccess();
+        onSuccess(data.address);
       } else {
         const data = await res.json().catch(() => ({}));
         setError(data.error ?? 'Failed to add address');

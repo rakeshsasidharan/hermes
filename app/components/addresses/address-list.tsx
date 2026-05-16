@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Table,
@@ -11,6 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AddAddressDialog } from './add-address-dialog';
 import { DeleteAddressDialog } from './delete-address-dialog';
 
@@ -35,15 +36,28 @@ function statusVariant(status: string): 'default' | 'secondary' | 'destructive' 
 export function AddressList({ addresses: initial, domains }: AddressListProps) {
   const router = useRouter();
   const [addresses, setAddresses] = useState<Address[]>(initial);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  function refresh() {
+  useEffect(() => {
+    setAddresses(initial);
+  }, [initial]);
+
+  function handleAddSuccess(address: Address) {
+    setAddresses((prev) => [address, ...prev]);
+    setSuccessMessage(`${address.email} added successfully`);
+    setTimeout(() => setSuccessMessage(null), 4000);
     router.refresh();
   }
 
   return (
     <div className="space-y-4">
+      {successMessage && (
+        <Alert>
+          <AlertDescription>{successMessage}</AlertDescription>
+        </Alert>
+      )}
       <div className="flex justify-end">
-        <AddAddressDialog domains={domains} onSuccess={refresh} />
+        <AddAddressDialog domains={domains} onSuccess={handleAddSuccess} />
       </div>
       <Table>
         <TableHeader>
