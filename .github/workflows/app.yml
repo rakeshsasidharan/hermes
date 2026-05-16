@@ -34,6 +34,7 @@ jobs:
             app/package-lock.json
             infra/package-lock.json
             infra/lambda/inbound-email-processor/package-lock.json
+            infra/lambda/ws-connect/package-lock.json
 
       - name: Install app dependencies
         working-directory: app
@@ -45,6 +46,14 @@ jobs:
 
       - name: Install infra dependencies
         working-directory: infra
+        run: npm ci
+
+      - name: Install inbound-email-processor dependencies
+        working-directory: infra/lambda/inbound-email-processor
+        run: npm ci
+
+      - name: Install ws-connect dependencies
+        working-directory: infra/lambda/ws-connect
         run: npm ci
 
       - name: Run infra tests
@@ -69,6 +78,7 @@ jobs:
           cache-dependency-path: |
             infra/package-lock.json
             infra/lambda/inbound-email-processor/package-lock.json
+            infra/lambda/ws-connect/package-lock.json
 
       - name: Configure AWS credentials (OIDC)
         id: aws-creds
@@ -80,6 +90,14 @@ jobs:
 
       - name: Install infra dependencies
         working-directory: infra
+        run: npm ci
+
+      - name: Install inbound-email-processor dependencies
+        working-directory: infra/lambda/inbound-email-processor
+        run: npm ci
+
+      - name: Install ws-connect dependencies
+        working-directory: infra/lambda/ws-connect
         run: npm ci
 
       - name: CDK diff
@@ -136,6 +154,7 @@ jobs:
           cache-dependency-path: |
             infra/package-lock.json
             infra/lambda/inbound-email-processor/package-lock.json
+            infra/lambda/ws-connect/package-lock.json
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -145,6 +164,14 @@ jobs:
 
       - name: Install infra dependencies
         working-directory: infra
+        run: npm ci
+
+      - name: Install inbound-email-processor dependencies
+        working-directory: infra/lambda/inbound-email-processor
+        run: npm ci
+
+      - name: Install ws-connect dependencies
+        working-directory: infra/lambda/ws-connect
         run: npm ci
 
       - name: Detect changed paths
