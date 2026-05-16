@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Download, Reply, ReplyAll, MailOpen } from 'lucide-react';
+import { ArrowLeft, Download, Reply, ReplyAll, MailOpen } from 'lucide-react';
 import { ReplyComposer } from '@/components/messages/reply-composer';
 
 interface Attachment {
@@ -40,7 +42,12 @@ interface MessageDetailProps {
 }
 
 export function MessageDetail({ message, initialHtmlBody, initialTextBody, initialDraftId, initialComposerMode }: MessageDetailProps) {
+  const pathname = usePathname();
+  const backHref = pathname.split('/').slice(0, -1).join('/') || '/';
+  const backLabel = pathname.startsWith('/sent') ? 'Back to Sent' : 'Back to Inbox';
+
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
   const [htmlBody, setHtmlBody] = useState<string | null>(initialHtmlBody ?? null);
   const [textBody, setTextBody] = useState<string | null>(initialTextBody ?? null);
   const [isRead, setIsRead] = useState(message.isRead);
@@ -83,6 +90,12 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
     }
   }
 
+  useEffect(() => {
+    if (composerMode && composerRef.current) {
+      composerRef.current.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    }
+  }, [composerMode]);
+
   function handleReply() {
     setComposerMode('reply');
   }
@@ -93,6 +106,15 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
 
   return (
     <div className="space-y-4">
+      <div>
+        <Button asChild variant="ghost" size="sm" className="gap-1.5 text-muted-foreground hover:text-foreground -ml-2">
+          <Link href={backHref}>
+            <ArrowLeft className="h-4 w-4" />
+            {backLabel}
+          </Link>
+        </Button>
+      </div>
+
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-4">
@@ -172,14 +194,16 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
       )}
 
       {composerMode && (
-        <ReplyComposer
-          message={message}
-          replyAll={composerMode === 'replyAll'}
-          currentAddress={message.address ?? message.to ?? ''}
-          quotedBody={textBody}
-          initialDraftId={initialDraftId}
-          onClose={() => setComposerMode(null)}
-        />
+        <div ref={composerRef}>
+          <ReplyComposer
+            message={message}
+            replyAll={composerMode === 'replyAll'}
+            currentAddress={message.address ?? message.to ?? ''}
+            quotedBody={textBody}
+            initialDraftId={initialDraftId}
+            onClose={() => setComposerMode(null)}
+          />
+        </div>
       )}
     </div>
   );

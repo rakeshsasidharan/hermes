@@ -105,6 +105,11 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
 
   const isSent = direction === 'outbound';
 
+  function extractDisplayName(emailStr: string): string {
+    const match = emailStr.match(/^(.+?)\s*<[^>]+>$/);
+    return match ? match[1].trim() : emailStr;
+  }
+
   return (
     <div className="space-y-4">
       <FilterBar onFilter={handleFilter} />
@@ -154,8 +159,10 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
                     {!isSent && !msg.isRead && (
                       <Badge variant="default" className="h-4 w-4 shrink-0 rounded-full p-0" aria-label="Unread" />
                     )}
-                    <span className="truncate max-w-45">
-                      {isSent ? (msg.to ?? '') : (msg.from ?? msg.sender ?? '')}
+                    <span className="truncate max-w-48">
+                      {isSent
+                        ? extractDisplayName(msg.to ?? '')
+                        : extractDisplayName(msg.from ?? msg.sender ?? '')}
                     </span>
                   </div>
                 </TableCell>

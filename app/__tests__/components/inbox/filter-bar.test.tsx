@@ -7,8 +7,8 @@ describe('FilterBar', () => {
     render(<FilterBar onFilter={jest.fn()} />);
     expect(screen.getByLabelText(/filter by sender/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/filter by subject/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/filter from date/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/filter to date/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /filter from date/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /filter to date/i })).toBeInTheDocument();
   });
 
   test('calls onFilter with values on submit', async () => {

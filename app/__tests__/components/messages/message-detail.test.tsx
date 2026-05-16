@@ -2,6 +2,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MessageDetail } from '@/components/messages/message-detail';
 
+jest.mock('next/navigation', () => ({
+  usePathname: () => '/inbox/test%40example.com/msg-1',
+  useRouter: () => ({ push: jest.fn() }),
+}));
+
 beforeEach(() => {
   global.fetch = jest.fn();
 });
