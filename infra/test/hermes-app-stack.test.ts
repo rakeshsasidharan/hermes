@@ -74,7 +74,7 @@ describe('HermesAppStack', () => {
             WS_CONNECTIONS_TABLE: 'hermes-ws-connections',
             S3_BUCKET: 'hermes-email-store',
             SES_RULE_SET_NAME: 'hermes-receipt-rules',
-            WEBSOCKET_ENDPOINT: MOCK_WS_ENDPOINT,
+            NEXT_PUBLIC_WEBSOCKET_ENDPOINT: MOCK_WS_ENDPOINT,
             INBOUND_PROCESSOR_ARN: 'arn:aws:lambda:us-east-1:123456789012:function:hermes-inbound-email-processor',
           }),
         },

@@ -138,7 +138,7 @@ export class HermesAppStack extends cdk.Stack {
         SES_RULE_SET_NAME: props.sesRuleSetName,
         COGNITO_USER_POOL_ID: props.userPool.ref,
         COGNITO_CLIENT_ID: props.userPoolClient.ref,
-        WEBSOCKET_ENDPOINT: props.websocketEndpoint,
+        NEXT_PUBLIC_WEBSOCKET_ENDPOINT: props.websocketEndpoint,
         INBOUND_PROCESSOR_ARN: props.inboundProcessorArn,
         ...(hostedZone ? { HOSTED_ZONE_ID: hostedZone.hostedZoneId } : {}),
       },
