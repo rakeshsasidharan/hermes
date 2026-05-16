@@ -60,6 +60,26 @@ export async function GET(req: NextRequest) {
     ':address': address,
   };
 
+  // receivedAt is the GSI sort key — it must go in KeyConditionExpression, not
+  // FilterExpression (DynamoDB rejects key attributes in FilterExpression).
+  // Only declare #receivedAt when it is actually referenced to avoid the
+  // "unused expression attribute name" ValidationException.
+  let keyConditionExpression = '#address = :address';
+  if (from && to) {
+    keyConditionExpression += ' AND #receivedAt BETWEEN :from AND :to';
+    expressionAttributeNames['#receivedAt'] = 'receivedAt';
+    expressionAttributeValues[':from'] = from;
+    expressionAttributeValues[':to'] = `${to}T23:59:59.999Z`;
+  } else if (from) {
+    keyConditionExpression += ' AND #receivedAt >= :from';
+    expressionAttributeNames['#receivedAt'] = 'receivedAt';
+    expressionAttributeValues[':from'] = from;
+  } else if (to) {
+    keyConditionExpression += ' AND #receivedAt <= :to';
+    expressionAttributeNames['#receivedAt'] = 'receivedAt';
+    expressionAttributeValues[':to'] = `${to}T23:59:59.999Z`;
+  }
+
   if (direction) {
     filterConditions.push('#direction = :direction');
     expressionAttributeNames['#direction'] = 'direction';
@@ -67,36 +87,22 @@ export async function GET(req: NextRequest) {
   }
 
   if (sender) {
-    filterConditions.push('contains(#sender, :sender)');
-    expressionAttributeNames['#sender'] = 'sender';
+    filterConditions.push('contains(#from, :sender)');
+    expressionAttributeNames['#from'] = 'from';
     expressionAttributeValues[':sender'] = sender.toLowerCase();
   }
 
   if (subject) {
     filterConditions.push('contains(#subject, :subject)');
     expressionAttributeNames['#subject'] = 'subject';
-    expressionAttributeValues[':subject'] = subject.toLowerCase();
-  }
-
-  if (from) {
-    filterConditions.push('#receivedAt >= :from');
-    expressionAttributeNames['#receivedAt'] = 'receivedAt';
-    expressionAttributeValues[':from'] = from;
-  }
-
-  if (to) {
-    if (!expressionAttributeNames['#receivedAt']) {
-      expressionAttributeNames['#receivedAt'] = 'receivedAt';
-    }
-    filterConditions.push('#receivedAt <= :to');
-    expressionAttributeValues[':to'] = to;
+    expressionAttributeValues[':subject'] = subject;
   }
 
   const dynamo = getDynamo();
   const result = await dynamo.send(new QueryCommand({
     TableName: process.env.MESSAGES_TABLE!,
     IndexName: 'address-receivedAt-index',
-    KeyConditionExpression: '#address = :address',
+    KeyConditionExpression: keyConditionExpression,
     ExpressionAttributeNames: {
       '#address': 'address',
       ...expressionAttributeNames,

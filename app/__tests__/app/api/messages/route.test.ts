@@ -144,7 +144,7 @@ describe('GET /api/messages', () => {
     expect(queryArg).toMatchObject({ ExclusiveStartKey: lastKey });
   });
 
-  test('filters by sender using contains (case-insensitive)', async () => {
+  test('filters by sender searching the from attribute (lowercased value)', async () => {
     mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
     mockDynamoSend.mockResolvedValue({ Items: [], LastEvaluatedKey: undefined });
 
@@ -152,12 +152,13 @@ describe('GET /api/messages', () => {
 
     const queryArg = (mockDynamoSend.mock.calls[0] as [Record<string, unknown>])[0];
     expect(queryArg).toMatchObject({
-      FilterExpression: expect.stringContaining('contains(#sender, :sender)'),
+      FilterExpression: expect.stringContaining('contains(#from, :sender)'),
+      ExpressionAttributeNames: expect.objectContaining({ '#from': 'from' }),
       ExpressionAttributeValues: expect.objectContaining({ ':sender': 'alice' }),
     });
   });
 
-  test('filters by subject using contains (case-insensitive)', async () => {
+  test('filters by subject using contains preserving original case', async () => {
     mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
     mockDynamoSend.mockResolvedValue({ Items: [], LastEvaluatedKey: undefined });
 
@@ -166,48 +167,67 @@ describe('GET /api/messages', () => {
     const queryArg = (mockDynamoSend.mock.calls[0] as [Record<string, unknown>])[0];
     expect(queryArg).toMatchObject({
       FilterExpression: expect.stringContaining('contains(#subject, :subject)'),
-      ExpressionAttributeValues: expect.objectContaining({ ':subject': 'hello world' }),
+      ExpressionAttributeValues: expect.objectContaining({ ':subject': 'Hello World' }),
     });
   });
 
-  test('filters by from date using >= comparison', async () => {
+  test('date after filter uses KeyConditionExpression range on GSI sort key', async () => {
     mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
     mockDynamoSend.mockResolvedValue({ Items: [], LastEvaluatedKey: undefined });
 
-    await GET(makeGetReq({ address: 'inbox@example.com', from: '2024-01-01T00:00:00Z' }));
+    await GET(makeGetReq({ address: 'inbox@example.com', from: '2024-01-01' }));
 
     const queryArg = (mockDynamoSend.mock.calls[0] as [Record<string, unknown>])[0];
     expect(queryArg).toMatchObject({
-      FilterExpression: expect.stringContaining('#receivedAt >= :from'),
-      ExpressionAttributeValues: expect.objectContaining({ ':from': '2024-01-01T00:00:00Z' }),
+      KeyConditionExpression: expect.stringContaining('#receivedAt >= :from'),
+      ExpressionAttributeValues: expect.objectContaining({ ':from': '2024-01-01' }),
     });
+    expect(queryArg.FilterExpression ?? '').not.toContain('#receivedAt');
   });
 
-  test('filters by to date using <= comparison', async () => {
+  test('date before filter uses KeyConditionExpression range and appends end-of-day', async () => {
     mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
     mockDynamoSend.mockResolvedValue({ Items: [], LastEvaluatedKey: undefined });
 
-    await GET(makeGetReq({ address: 'inbox@example.com', to: '2024-01-31T23:59:59Z' }));
+    await GET(makeGetReq({ address: 'inbox@example.com', to: '2024-01-31' }));
 
     const queryArg = (mockDynamoSend.mock.calls[0] as [Record<string, unknown>])[0];
     expect(queryArg).toMatchObject({
-      FilterExpression: expect.stringContaining('#receivedAt <= :to'),
-      ExpressionAttributeValues: expect.objectContaining({ ':to': '2024-01-31T23:59:59Z' }),
+      KeyConditionExpression: expect.stringContaining('#receivedAt <= :to'),
+      ExpressionAttributeValues: expect.objectContaining({ ':to': '2024-01-31T23:59:59.999Z' }),
     });
+    expect(queryArg.FilterExpression ?? '').not.toContain('#receivedAt');
   });
 
-  test('combines multiple filters with AND', async () => {
+  test('both date filters use BETWEEN in KeyConditionExpression', async () => {
     mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
     mockDynamoSend.mockResolvedValue({ Items: [], LastEvaluatedKey: undefined });
 
-    await GET(makeGetReq({ address: 'inbox@example.com', sender: 'alice', from: '2024-01-01T00:00:00Z', to: '2024-01-31T23:59:59Z' }));
+    await GET(makeGetReq({ address: 'inbox@example.com', from: '2024-01-01', to: '2024-01-31' }));
 
     const queryArg = (mockDynamoSend.mock.calls[0] as [Record<string, unknown>])[0];
+    expect(queryArg).toMatchObject({
+      KeyConditionExpression: expect.stringContaining('BETWEEN :from AND :to'),
+      ExpressionAttributeValues: expect.objectContaining({
+        ':from': '2024-01-01',
+        ':to': '2024-01-31T23:59:59.999Z',
+      }),
+    });
+  });
+
+  test('combines sender and subject filters with AND in FilterExpression', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+    mockDynamoSend.mockResolvedValue({ Items: [], LastEvaluatedKey: undefined });
+
+    await GET(makeGetReq({ address: 'inbox@example.com', sender: 'alice', subject: 'Hello', from: '2024-01-01' }));
+
+    const queryArg = (mockDynamoSend.mock.calls[0] as [Record<string, unknown>])[0];
+    expect(queryArg.KeyConditionExpression).toContain('#receivedAt >= :from');
     const filter = queryArg.FilterExpression as string;
-    expect(filter).toContain('contains(#sender, :sender)');
-    expect(filter).toContain('#receivedAt >= :from');
-    expect(filter).toContain('#receivedAt <= :to');
+    expect(filter).toContain('contains(#from, :sender)');
+    expect(filter).toContain('contains(#subject, :subject)');
     expect(filter).toMatch(/AND/);
+    expect(filter).not.toContain('#receivedAt');
   });
 
   test('does not include FilterExpression when no filters provided', async () => {

@@ -27,6 +27,7 @@ export function DatePicker({ value, onChange, placeholder = 'Pick a date', class
     <Popover>
       <PopoverTrigger asChild>
         <Button
+          type="button"
           variant="outline"
           aria-label={ariaLabel}
           className={cn('h-8 w-40 justify-start text-left font-normal text-sm px-2', !value && 'text-muted-foreground', className)}
