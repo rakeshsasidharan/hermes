@@ -48,7 +48,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Sidebar addresses={addresses} />
           <div className="flex flex-1 flex-col overflow-hidden">
             <Topbar />
-            <main className="flex-1 overflow-y-auto p-6">{children}</main>
+            <main className="flex-1 overflow-y-auto px-6 pb-6 pt-3">{children}</main>
           </div>
         </div>
         <ComposeSheet addresses={addresses} />

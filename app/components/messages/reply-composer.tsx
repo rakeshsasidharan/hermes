@@ -27,6 +27,7 @@ interface UploadedAttachment {
 interface ReplyComposerProps {
   message: Message;
   replyAll?: boolean;
+  isSent?: boolean;
   currentAddress: string;
   quotedBody?: string | null;
   initialDraftId?: string | null;
@@ -36,8 +37,11 @@ interface ReplyComposerProps {
 
 type SaveStatus = 'idle' | 'saving' | 'saved';
 
-function buildCcForReplyAll(message: Message, currentAddress: string): string {
-  const addresses = [message.to, message.cc]
+function buildCcForReplyAll(message: Message, currentAddress: string, isSent: boolean): string {
+  // For inbox: cc everyone from to+cc except ourselves.
+  // For sent: the original to is already the primary To, so only pull from cc.
+  const sources = isSent ? [message.cc] : [message.to, message.cc];
+  const addresses = sources
     .filter(Boolean)
     .join(', ')
     .split(',')
@@ -49,6 +53,7 @@ function buildCcForReplyAll(message: Message, currentAddress: string): string {
 export function ReplyComposer({
   message,
   replyAll = false,
+  isSent = false,
   currentAddress,
   quotedBody,
   initialDraftId = null,
@@ -64,8 +69,8 @@ export function ReplyComposer({
     ? `\n\n--- Original Message ---\n${quotedBody}`
     : '');
 
-  const [to, setTo] = useState(message.from ?? '');
-  const [cc, setCc] = useState(replyAll ? buildCcForReplyAll(message, currentAddress) : '');
+  const [to, setTo] = useState(isSent ? (message.to ?? '') : (message.from ?? ''));
+  const [cc, setCc] = useState(replyAll ? buildCcForReplyAll(message, currentAddress, isSent) : '');
   const [body, setBody] = useState(defaultBody);
   const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
   const [draftId, setDraftId] = useState<string | null>(initialDraftId);

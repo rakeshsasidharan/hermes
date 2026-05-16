@@ -60,7 +60,9 @@ export function Sidebar({ addresses }: SidebarProps) {
     <TooltipProvider>
       <aside className="flex h-full w-64 flex-col border-r bg-background">
         <div className="flex h-14 items-center border-b px-4">
-          <span className="text-lg font-semibold">Hermes</span>
+          <Link href="/" className="text-lg font-semibold hover:opacity-75 transition-opacity">
+            Hermes
+          </Link>
         </div>
 
         <div className="flex flex-col gap-1 p-3">

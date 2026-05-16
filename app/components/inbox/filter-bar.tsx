@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Search, X } from 'lucide-react';
 
 export interface Filters {
@@ -43,7 +44,7 @@ export function FilterBar({ onFilter }: FilterBarProps) {
         placeholder="From"
         value={filters.sender}
         onChange={(e) => update('sender', e.target.value)}
-        className="h-8 w-40 text-sm"
+        className="h-8 w-36 text-sm"
         aria-label="Filter by sender"
       />
       <Input
@@ -53,18 +54,16 @@ export function FilterBar({ onFilter }: FilterBarProps) {
         className="h-8 w-48 text-sm"
         aria-label="Filter by subject"
       />
-      <Input
-        placeholder="After (YYYY-MM-DD)"
+      <DatePicker
         value={filters.from}
-        onChange={(e) => update('from', e.target.value)}
-        className="h-8 w-44 text-sm"
+        onChange={(v) => update('from', v)}
+        placeholder="After date"
         aria-label="Filter from date"
       />
-      <Input
-        placeholder="Before (YYYY-MM-DD)"
+      <DatePicker
         value={filters.to}
-        onChange={(e) => update('to', e.target.value)}
-        className="h-8 w-44 text-sm"
+        onChange={(v) => update('to', v)}
+        placeholder="Before date"
         aria-label="Filter to date"
       />
       <Button type="submit" size="sm" variant="secondary" className="h-8 gap-1">

@@ -8,9 +8,9 @@ function getTitle(pathname: string): string {
   if (pathname === '/compose') return 'Compose';
   if (pathname === '/addresses') return 'Addresses';
 
-  const inboxMatch = pathname.match(/^\/inbox\/([^/]+)(?:\/[^/]+)?$/);
-  if (inboxMatch) {
-    return decodeURIComponent(inboxMatch[1]);
+  const mailboxMatch = pathname.match(/^\/(inbox|sent)\/([^/]+)(?:\/[^/]+)?$/);
+  if (mailboxMatch) {
+    return decodeURIComponent(mailboxMatch[2]);
   }
 
   return 'Hermes';

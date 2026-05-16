@@ -51,10 +51,7 @@ export default async function InboxPage({ params }: Props) {
 
   return (
     <div className="space-y-4">
-      <div>
-        <p className="text-xs text-muted-foreground">{decodedAddress}</p>
-        <h2 className="text-lg font-semibold">Inbox</h2>
-      </div>
+      <h2 className="text-lg font-semibold">Inbox</h2>
       <MessageList
         address={decodedAddress}
         direction="inbound"
