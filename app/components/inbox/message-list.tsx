@@ -107,7 +107,8 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
 
   function extractDisplayName(emailStr: string): string {
     const match = emailStr.match(/^(.+?)\s*<[^>]+>$/);
-    return match ? match[1].trim() : emailStr;
+    const name = match ? match[1].trim() : emailStr;
+    return name.replace(/^"|"$/g, '');
   }
 
   return (
