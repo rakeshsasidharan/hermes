@@ -12,6 +12,15 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
+jest.mock('next/link', () => {
+  const OriginalLink = jest.requireActual('next/link').default;
+  return {
+    __esModule: true,
+    default: OriginalLink,
+    useLinkStatus: () => ({ pending: false }),
+  };
+});
+
 let wsHandler: ((event: WsNewMessageEvent) => void) | null = null;
 const mockSubscribe = jest.fn((handler: (event: WsNewMessageEvent) => void) => {
   wsHandler = handler;
@@ -96,7 +105,7 @@ describe('Sidebar', () => {
     mockPathname.mockReturnValue('/addresses');
     render(<Sidebar addresses={ADDRESSES} />);
     const link = screen.getByRole('link', { name: /^addresses$/i });
-    expect(link.className).toContain('bg-accent');
+    expect(link.firstElementChild?.className).toContain('bg-accent');
   });
 
   test('renders Inbox and Sent sub-nav for each address', () => {
@@ -121,21 +130,21 @@ describe('Sidebar', () => {
     mockPathname.mockReturnValue('/inbox/hello%40example.com');
     render(<Sidebar addresses={ADDRESSES} />);
     const inboxLinks = screen.getAllByRole('link', { name: /^inbox$/i });
-    expect(inboxLinks[0].className).toContain('bg-accent');
+    expect(inboxLinks[0].firstElementChild?.className).toContain('bg-accent');
   });
 
   test('Sent sub-link has active style when on sent route', () => {
     mockPathname.mockReturnValue('/sent/hello%40example.com');
     render(<Sidebar addresses={ADDRESSES} />);
     const sentLinks = screen.getAllByRole('link', { name: /^sent$/i });
-    expect(sentLinks[0].className).toContain('bg-accent');
+    expect(sentLinks[0].firstElementChild?.className).toContain('bg-accent');
   });
 
   test('Sent sub-link stays active when viewing a sent message detail', () => {
     mockPathname.mockReturnValue('/sent/hello%40example.com/msg-123');
     render(<Sidebar addresses={ADDRESSES} />);
     const sentLinks = screen.getAllByRole('link', { name: /^sent$/i });
-    expect(sentLinks[0].className).toContain('bg-accent');
+    expect(sentLinks[0].firstElementChild?.className).toContain('bg-accent');
   });
 
   test('increments unread badge when WebSocket new_message event arrives', async () => {

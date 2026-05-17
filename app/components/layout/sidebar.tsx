@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { useLinkStatus } from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -10,9 +10,37 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useWs } from '@/components/ws-context';
 import { useCompose } from '@/components/compose-context';
 
-import { Mail, FileText, Settings, LogOut, PenSquare, Globe, AtSign, Inbox, Send } from 'lucide-react';
+import { Mail, FileText, Settings, LogOut, PenSquare, Globe, AtSign, Inbox, Send, Loader2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+
+interface NavLinkInnerProps {
+  icon: React.ElementType;
+  label: string;
+  isActive: boolean;
+  size?: 'default' | 'sm';
+}
+
+function NavLinkInner({ icon: Icon, label, isActive, size = 'default' }: NavLinkInnerProps) {
+  const { pending } = useLinkStatus();
+  const active = isActive || pending;
+  const iconClass = cn('shrink-0', size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4');
+
+  return (
+    <span
+      className={cn(
+        'flex w-full items-center gap-2 rounded-md px-2 text-sm transition-colors',
+        size === 'sm' ? 'py-1' : 'py-1.5',
+        active
+          ? 'bg-accent text-accent-foreground font-medium'
+          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+      )}
+    >
+      {pending ? <Loader2 className={cn(iconClass, 'animate-spin')} /> : <Icon className={iconClass} />}
+      {label}
+    </span>
+  );
+}
 
 interface Address {
   email: string;
@@ -117,31 +145,13 @@ export function Sidebar({ addresses }: SidebarProps) {
                   </Tooltip>
                   <ul className="ml-6 mt-0.5 space-y-0.5">
                     <li>
-                      <Link
-                        href={inboxHref}
-                        className={cn(
-                          'flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors',
-                          inboxActive
-                            ? 'bg-accent text-accent-foreground font-medium'
-                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                        )}
-                      >
-                        <Inbox className="h-3.5 w-3.5 shrink-0" />
-                        Inbox
+                      <Link href={inboxHref} className="block">
+                        <NavLinkInner icon={Inbox} label="Inbox" isActive={inboxActive} size="sm" />
                       </Link>
                     </li>
                     <li>
-                      <Link
-                        href={sentHref}
-                        className={cn(
-                          'flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors',
-                          sentActive
-                            ? 'bg-accent text-accent-foreground font-medium'
-                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                        )}
-                      >
-                        <Send className="h-3.5 w-3.5 shrink-0" />
-                        Sent
+                      <Link href={sentHref} className="block">
+                        <NavLinkInner icon={Send} label="Sent" isActive={sentActive} size="sm" />
                       </Link>
                     </li>
                   </ul>
@@ -157,59 +167,23 @@ export function Sidebar({ addresses }: SidebarProps) {
 
           <ul className="space-y-1">
             <li>
-              <Link
-                href="/addresses"
-                className={cn(
-                  'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
-                  pathname === '/addresses'
-                    ? 'bg-accent text-accent-foreground font-medium'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                )}
-              >
-                <AtSign className="h-4 w-4 shrink-0" />
-                Addresses
+              <Link href="/addresses" className="block">
+                <NavLinkInner icon={AtSign} label="Addresses" isActive={pathname === '/addresses'} />
               </Link>
             </li>
             <li>
-              <Link
-                href="/domains"
-                className={cn(
-                  'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
-                  pathname === '/domains'
-                    ? 'bg-accent text-accent-foreground font-medium'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                )}
-              >
-                <Globe className="h-4 w-4 shrink-0" />
-                Domains
+              <Link href="/domains" className="block">
+                <NavLinkInner icon={Globe} label="Domains" isActive={pathname === '/domains'} />
               </Link>
             </li>
             <li>
-              <Link
-                href="/drafts"
-                className={cn(
-                  'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
-                  pathname === '/drafts'
-                    ? 'bg-accent text-accent-foreground font-medium'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                )}
-              >
-                <FileText className="h-4 w-4 shrink-0" />
-                Drafts
+              <Link href="/drafts" className="block">
+                <NavLinkInner icon={FileText} label="Drafts" isActive={pathname === '/drafts'} />
               </Link>
             </li>
             <li>
-              <Link
-                href="/settings"
-                className={cn(
-                  'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
-                  pathname === '/settings'
-                    ? 'bg-accent text-accent-foreground font-medium'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                )}
-              >
-                <Settings className="h-4 w-4 shrink-0" />
-                Settings
+              <Link href="/settings" className="block">
+                <NavLinkInner icon={Settings} label="Settings" isActive={pathname === '/settings'} />
               </Link>
             </li>
           </ul>
