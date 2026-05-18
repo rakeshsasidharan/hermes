@@ -4,6 +4,11 @@ import { ComposeSheet } from '@/components/messages/compose-sheet';
 import { ComposeProvider } from '@/components/compose-context';
 import { useCompose } from '@/components/compose-context';
 
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: jest.fn() }),
+  usePathname: () => '/',
+}));
+
 jest.mock('@/components/ui/sheet', () => ({
   Sheet: ({ children, open }: { children: React.ReactNode; open: boolean }) =>
     open ? <div data-testid="sheet-root">{children}</div> : null,
@@ -42,24 +47,16 @@ function TestWrapper({ initialData }: { initialData?: Parameters<ReturnType<type
 
 beforeEach(() => {
   global.fetch = jest.fn();
-  jest.useFakeTimers();
 });
 
 afterEach(() => {
   jest.clearAllMocks();
-  jest.useRealTimers();
 });
-
-async function advanceAutoSave() {
-  await act(async () => {
-    jest.advanceTimersByTime(10_000);
-  });
-}
 
 describe('ComposeSheet', () => {
   describe('From dropdown', () => {
     test('shows only active (non-deleted) addresses in From dropdown', async () => {
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const user = userEvent.setup();
       render(<TestWrapper />);
 
       await user.click(screen.getByTestId('open-compose'));
@@ -69,7 +66,7 @@ describe('ComposeSheet', () => {
     });
 
     test('defaults From to first active address', async () => {
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const user = userEvent.setup();
       render(<TestWrapper />);
 
       await user.click(screen.getByTestId('open-compose'));
@@ -80,7 +77,7 @@ describe('ComposeSheet', () => {
 
   describe('email validation', () => {
     test('shows validation error for invalid email in To field', async () => {
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const user = userEvent.setup();
       render(<TestWrapper />);
 
       await user.click(screen.getByTestId('open-compose'));
@@ -94,7 +91,7 @@ describe('ComposeSheet', () => {
     });
 
     test('shows validation error for invalid email in Cc field', async () => {
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const user = userEvent.setup();
       render(<TestWrapper />);
 
       await user.click(screen.getByTestId('open-compose'));
@@ -113,7 +110,7 @@ describe('ComposeSheet', () => {
         ok: true,
         json: async () => ({ messageId: 'new-msg' }),
       });
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const user = userEvent.setup();
       render(<TestWrapper />);
 
       await user.click(screen.getByTestId('open-compose'));
@@ -127,30 +124,27 @@ describe('ComposeSheet', () => {
     });
   });
 
-  describe('auto-save', () => {
-    test('shows Saving… indicator while save is in-flight', async () => {
-      (global.fetch as jest.Mock).mockReturnValue(new Promise(() => {}));
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+  describe('save draft button', () => {
+    test('shows Save Draft button in compose form', async () => {
+      const user = userEvent.setup();
       render(<TestWrapper />);
 
       await user.click(screen.getByTestId('open-compose'));
-      await user.type(screen.getByTestId('compose-body'), 'Hello');
-      await advanceAutoSave();
 
-      expect(screen.getByTestId('save-status-saving')).toBeInTheDocument();
+      expect(screen.getByTestId('compose-save-draft-button')).toBeInTheDocument();
     });
 
-    test('calls POST /api/drafts on first auto-save', async () => {
+    test('calls POST /api/drafts when Save Draft is clicked for a new draft', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
         json: async () => ({ draftId: 'draft-new' }),
       });
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const user = userEvent.setup();
       render(<TestWrapper />);
 
       await user.click(screen.getByTestId('open-compose'));
       await user.type(screen.getByTestId('compose-body'), 'Hello');
-      await advanceAutoSave();
+      await user.click(screen.getByTestId('compose-save-draft-button'));
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith(
@@ -160,7 +154,45 @@ describe('ComposeSheet', () => {
       });
     });
 
-    test('shows Draft saved indicator after successful save', async () => {
+    test('shows Draft saved indicator after Save Draft is clicked', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ draftId: 'draft-new' }),
+      });
+      const user = userEvent.setup();
+      render(<TestWrapper />);
+
+      await user.click(screen.getByTestId('open-compose'));
+      await user.type(screen.getByTestId('compose-body'), 'Hello');
+      await user.click(screen.getByTestId('compose-save-draft-button'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('save-status-saved')).toBeInTheDocument();
+      });
+    });
+
+    test('calls PUT /api/drafts/:id when Save Draft is clicked with an existing draft', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ draftId: 'draft-existing' }),
+      });
+      const user = userEvent.setup();
+      render(<TestWrapper initialData={{ draftId: 'draft-existing' }} />);
+
+      await user.click(screen.getByTestId('open-compose'));
+      await user.type(screen.getByTestId('compose-body'), 'Hello');
+      await user.click(screen.getByTestId('compose-save-draft-button'));
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          '/api/drafts/draft-existing',
+          expect.objectContaining({ method: 'PUT' }),
+        );
+      });
+    });
+
+    test('does not auto-save when fields change', async () => {
+      jest.useFakeTimers();
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
         json: async () => ({ draftId: 'draft-new' }),
@@ -170,31 +202,13 @@ describe('ComposeSheet', () => {
 
       await user.click(screen.getByTestId('open-compose'));
       await user.type(screen.getByTestId('compose-body'), 'Hello');
-      await advanceAutoSave();
+      await act(async () => { jest.advanceTimersByTime(30_000); });
 
-      await waitFor(() => {
-        expect(screen.getByTestId('save-status-saved')).toBeInTheDocument();
-      });
-    });
-
-    test('calls PUT /api/drafts/:id on subsequent saves when initialDraftId is provided', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: async () => ({ draftId: 'draft-existing' }),
-      });
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
-      render(<TestWrapper initialData={{ draftId: 'draft-existing' }} />);
-
-      await user.click(screen.getByTestId('open-compose'));
-      await user.type(screen.getByTestId('compose-body'), 'Hello');
-      await advanceAutoSave();
-
-      await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(
-          '/api/drafts/draft-existing',
-          expect.objectContaining({ method: 'PUT' }),
-        );
-      });
+      expect(global.fetch).not.toHaveBeenCalledWith(
+        '/api/drafts',
+        expect.objectContaining({ method: 'POST' }),
+      );
+      jest.useRealTimers();
     });
   });
 
@@ -204,7 +218,7 @@ describe('ComposeSheet', () => {
         ok: true,
         json: async () => ({ messageId: 'new-msg' }),
       });
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const user = userEvent.setup();
       render(<TestWrapper />);
 
       await user.click(screen.getByTestId('open-compose'));
@@ -225,7 +239,7 @@ describe('ComposeSheet', () => {
         ok: true,
         json: async () => ({ messageId: 'new-msg' }),
       });
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const user = userEvent.setup();
       render(<TestWrapper />);
 
       await user.click(screen.getByTestId('open-compose'));
@@ -243,7 +257,7 @@ describe('ComposeSheet', () => {
         ok: false,
         json: async () => ({ error: 'Send failed' }),
       });
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const user = userEvent.setup();
       render(<TestWrapper />);
 
       await user.click(screen.getByTestId('open-compose'));
@@ -260,7 +274,7 @@ describe('ComposeSheet', () => {
   describe('discard', () => {
     test('calls DELETE /api/drafts/:id when draftId exists', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({}) });
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const user = userEvent.setup();
       render(<TestWrapper initialData={{ draftId: 'draft-abc' }} />);
 
       await user.click(screen.getByTestId('open-compose'));
@@ -275,7 +289,7 @@ describe('ComposeSheet', () => {
     });
 
     test('closes sheet on discard without draft', async () => {
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const user = userEvent.setup();
       render(<TestWrapper />);
 
       await user.click(screen.getByTestId('open-compose'));
@@ -291,7 +305,7 @@ describe('ComposeSheet', () => {
 
   describe('restoring draft fields', () => {
     test('restores all fields from initialData', async () => {
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const user = userEvent.setup();
       render(
         <TestWrapper
           initialData={{

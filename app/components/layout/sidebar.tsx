@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useWs } from '@/components/ws-context';
 import { useCompose } from '@/components/compose-context';
 
-import { Mail, FileText, Settings, LogOut, PenSquare, Globe, AtSign, Inbox, Send, Loader2 } from 'lucide-react';
+import { Mail, Settings, LogOut, PenSquare, Globe, AtSign, Inbox, Send, Loader2, BookMarked } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
@@ -116,9 +116,11 @@ export function Sidebar({ addresses }: SidebarProps) {
             {addresses.map((addr) => {
               const inboxHref = `/inbox/${encodeURIComponent(addr.email)}`;
               const sentHref = `/sent/${encodeURIComponent(addr.email)}`;
+              const draftsHref = `/drafts/${encodeURIComponent(addr.email)}`;
               const inboxActive = pathname.startsWith(inboxHref);
               const sentActive = pathname.startsWith(sentHref);
-              const isAddressActive = inboxActive || sentActive;
+              const draftsActive = pathname.startsWith(draftsHref);
+              const isAddressActive = inboxActive || sentActive || draftsActive;
               const count = unreadCounts.get(addr.email) ?? 0;
               return (
                 <li key={addr.email}>
@@ -154,6 +156,11 @@ export function Sidebar({ addresses }: SidebarProps) {
                         <NavLinkInner icon={Send} label="Sent" isActive={sentActive} size="sm" />
                       </Link>
                     </li>
+                    <li>
+                      <Link href={draftsHref} className="block">
+                        <NavLinkInner icon={BookMarked} label="Drafts" isActive={draftsActive} size="sm" />
+                      </Link>
+                    </li>
                   </ul>
                 </li>
               );
@@ -174,11 +181,6 @@ export function Sidebar({ addresses }: SidebarProps) {
             <li>
               <Link href="/domains" className="block">
                 <NavLinkInner icon={Globe} label="Domains" isActive={pathname === '/domains'} />
-              </Link>
-            </li>
-            <li>
-              <Link href="/drafts" className="block">
-                <NavLinkInner icon={FileText} label="Drafts" isActive={pathname === '/drafts'} />
               </Link>
             </li>
             <li>

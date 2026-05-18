@@ -35,8 +35,14 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
-function makeGetReq() {
-  return new NextRequest('http://localhost/api/drafts');
+function makeGetReq(params?: Record<string, string>) {
+  const url = new URL('http://localhost/api/drafts');
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      url.searchParams.set(k, v);
+    }
+  }
+  return new NextRequest(url.toString());
 }
 
 function makePostReq(body: Record<string, unknown> = {}) {
@@ -78,6 +84,21 @@ describe('GET /api/drafts', () => {
       TableName: 'hermes-drafts',
       FilterExpression: 'userId = :userId',
       ExpressionAttributeValues: { ':userId': 'user-42' },
+    });
+  });
+
+  test('filters by from address when ?from= param is provided', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-42' });
+    mockDynamoSend.mockResolvedValue({ Items: [] });
+
+    await GET(makeGetReq({ from: 'me@hermes.com' }));
+
+    const scanArg = (mockDynamoSend.mock.calls[0] as [Record<string, unknown>])[0];
+    expect(scanArg).toMatchObject({
+      TableName: 'hermes-drafts',
+      FilterExpression: 'userId = :userId AND #from = :from',
+      ExpressionAttributeValues: { ':userId': 'user-42', ':from': 'me@hermes.com' },
+      ExpressionAttributeNames: { '#from': 'from' },
     });
   });
 

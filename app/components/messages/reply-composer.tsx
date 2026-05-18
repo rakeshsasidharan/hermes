@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Paperclip, Send, Trash2, X } from 'lucide-react';
+import { BookMarked, Paperclip, Send, Trash2, X } from 'lucide-react';
 
 interface Message {
   messageId: string;
@@ -60,6 +61,7 @@ export function ReplyComposer({
   initialBody,
   onClose,
 }: ReplyComposerProps) {
+  const router = useRouter();
   const originalSubject = message.subject ?? '';
   const reSubject = originalSubject.toLowerCase().startsWith('re:')
     ? originalSubject
@@ -80,7 +82,6 @@ export function ReplyComposer({
   const [sendError, setSendError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function saveDraft(draftPayload: Record<string, unknown>, existingDraftId: string | null): Promise<string | null> {
@@ -117,47 +118,19 @@ export function ReplyComposer({
     }
   }
 
-  function scheduleSave(currentDraftId: string | null, payload: Record<string, unknown>) {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      saveDraft(payload, currentDraftId);
-    }, 10_000);
-  }
-
-  function handleBodyChange(value: string) {
-    setBody(value);
-    scheduleSave(draftId, {
+  function buildPayload() {
+    return {
       from: currentAddress,
       to,
-      cc: cc || undefined,
-      body: value,
-      attachmentKeys: attachments.map((a) => a.s3Key),
-      inReplyToMessageId: message.messageId,
-    });
-  }
-
-  function handleToChange(value: string) {
-    setTo(value);
-    scheduleSave(draftId, {
-      from: currentAddress,
-      to: value,
       cc: cc || undefined,
       body,
       attachmentKeys: attachments.map((a) => a.s3Key),
       inReplyToMessageId: message.messageId,
-    });
+    };
   }
 
-  function handleCcChange(value: string) {
-    setCc(value);
-    scheduleSave(draftId, {
-      from: currentAddress,
-      to,
-      cc: value || undefined,
-      body,
-      attachmentKeys: attachments.map((a) => a.s3Key),
-      inReplyToMessageId: message.messageId,
-    });
+  async function handleSaveDraft() {
+    await saveDraft(buildPayload(), draftId);
   }
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -183,7 +156,6 @@ export function ReplyComposer({
   }
 
   async function handleSend() {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
     setIsSending(true);
     setSendError(null);
     try {
@@ -205,6 +177,7 @@ export function ReplyComposer({
         return;
       }
       onClose();
+      router.refresh();
     } catch {
       setSendError('Failed to send reply. Please try again.');
     } finally {
@@ -213,18 +186,12 @@ export function ReplyComposer({
   }
 
   async function handleDiscard() {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
     if (draftId) {
       await fetch(`/api/drafts/${draftId}`, { method: 'DELETE' }).catch(() => null);
     }
     onClose();
+    router.refresh();
   }
-
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, []);
 
   function formatSavedAt(date: Date) {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -238,9 +205,6 @@ export function ReplyComposer({
             <span className="text-sm font-medium">
               {replyAll ? 'Reply All' : 'Reply'}
             </span>
-            {saveStatus === 'saving' && (
-              <span className="text-xs text-muted-foreground" data-testid="save-status-saving">Saving…</span>
-            )}
             {saveStatus === 'saved' && savedAt && (
               <span className="text-xs text-muted-foreground" data-testid="save-status-saved">
                 Draft saved {formatSavedAt(savedAt)}
@@ -271,7 +235,7 @@ export function ReplyComposer({
           <Input
             id="reply-to"
             value={to}
-            onChange={(e) => handleToChange(e.target.value)}
+            onChange={(e) => setTo(e.target.value)}
             placeholder="recipient@example.com"
             data-testid="reply-to"
           />
@@ -283,7 +247,7 @@ export function ReplyComposer({
             <Input
               id="reply-cc"
               value={cc}
-              onChange={(e) => handleCcChange(e.target.value)}
+              onChange={(e) => setCc(e.target.value)}
               placeholder="cc@example.com"
               data-testid="reply-cc"
             />
@@ -295,7 +259,7 @@ export function ReplyComposer({
           <Textarea
             id="reply-body"
             value={body}
-            onChange={(e) => handleBodyChange(e.target.value)}
+            onChange={(e) => setBody(e.target.value)}
             placeholder="Write your reply…"
             className="min-h-[160px] resize-y"
             data-testid="reply-body"
@@ -352,6 +316,17 @@ export function ReplyComposer({
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleSaveDraft}
+              disabled={saveStatus === 'saving'}
+              className="gap-1"
+              data-testid="save-draft-button"
+            >
+              <BookMarked className="h-3.5 w-3.5" />
+              {saveStatus === 'saving' ? 'Saving…' : 'Save Draft'}
+            </Button>
             <Button
               size="sm"
               variant="ghost"
