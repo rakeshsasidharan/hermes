@@ -57,7 +57,7 @@ export function DraftsList({ drafts }: DraftsListProps) {
         <FileText className="h-10 w-10 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">No drafts saved yet.</p>
         <p className="text-xs text-muted-foreground">
-          Drafts are saved automatically as you compose or reply.
+          Click &quot;Save Draft&quot; in the compose or reply dialog to save a draft here.
         </p>
       </div>
     );

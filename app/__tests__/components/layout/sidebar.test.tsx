@@ -86,13 +86,30 @@ describe('Sidebar', () => {
     expect(screen.getByText(/no addresses yet/i)).toBeInTheDocument();
   });
 
-  test('renders Compose, Addresses, Domains, Drafts, Settings links', () => {
+  test('renders Compose, Addresses, Domains, Settings links', () => {
     render(<Sidebar addresses={ADDRESSES} />);
     expect(screen.getByText('Compose')).toBeInTheDocument();
     expect(screen.getByText('Addresses')).toBeInTheDocument();
     expect(screen.getByText('Domains')).toBeInTheDocument();
-    expect(screen.getByText('Drafts')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
+  });
+
+  test('renders Drafts sub-nav for each address', () => {
+    render(<Sidebar addresses={ADDRESSES} />);
+    expect(screen.getAllByText('Drafts')).toHaveLength(ADDRESSES.length);
+  });
+
+  test('Drafts sub-link points to /drafts/[address]', () => {
+    render(<Sidebar addresses={ADDRESSES} />);
+    const draftsLinks = screen.getAllByRole('link', { name: /^drafts$/i });
+    expect(draftsLinks[0]).toHaveAttribute('href', '/drafts/hello%40example.com');
+  });
+
+  test('Drafts sub-link has active style when on drafts route', () => {
+    mockPathname.mockReturnValue('/drafts/hello%40example.com');
+    render(<Sidebar addresses={ADDRESSES} />);
+    const draftsLinks = screen.getAllByRole('link', { name: /^drafts$/i });
+    expect(draftsLinks[0].firstElementChild?.className).toContain('bg-accent');
   });
 
   test('Addresses link points to /addresses', () => {

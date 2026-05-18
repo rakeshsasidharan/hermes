@@ -18,11 +18,24 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 
+  const fromFilter = req.nextUrl.searchParams.get('from');
+
   const dynamo = getDynamo();
+  const filterParts = ['userId = :userId'];
+  const exprValues: Record<string, unknown> = { ':userId': claims.sub };
+  const exprNames: Record<string, string> = {};
+
+  if (fromFilter) {
+    filterParts.push('#from = :from');
+    exprNames['#from'] = 'from';
+    exprValues[':from'] = fromFilter;
+  }
+
   const result = await dynamo.send(new ScanCommand({
     TableName: process.env.DRAFTS_TABLE!,
-    FilterExpression: 'userId = :userId',
-    ExpressionAttributeValues: { ':userId': claims.sub },
+    FilterExpression: filterParts.join(' AND '),
+    ExpressionAttributeValues: exprValues,
+    ...(Object.keys(exprNames).length > 0 ? { ExpressionAttributeNames: exprNames } : {}),
   }));
 
   const drafts = (result.Items ?? []).sort((a, b) => {

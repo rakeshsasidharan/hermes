@@ -17,7 +17,8 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Paperclip, Send, Trash2, X } from 'lucide-react';
+import { BookMarked, Paperclip, Send, Trash2, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useCompose, type ComposeInitialData } from '@/components/compose-context';
 
 interface Address {
@@ -69,6 +70,7 @@ interface ComposeSheetInnerProps {
 }
 
 function ComposeSheetInner({ addresses, initialData, onClose }: ComposeSheetInnerProps) {
+  const router = useRouter();
   const activeAddresses = addresses.filter((a) => a.status !== 'deleted');
 
   const form = useForm<ComposeFormValues>({
@@ -91,19 +93,12 @@ function ComposeSheetInner({ addresses, initialData, onClose }: ComposeSheetInne
   const [sendError, setSendError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const draftIdRef = useRef<string | null>(draftId);
 
   useEffect(() => {
     draftIdRef.current = draftId;
   }, [draftId]);
-
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, []);
 
   async function saveDraft(payload: Record<string, unknown>, existingDraftId: string | null): Promise<string | null> {
     setSaveStatus('saving');
@@ -139,28 +134,21 @@ function ComposeSheetInner({ addresses, initialData, onClose }: ComposeSheetInne
     }
   }
 
-  function scheduleSave(payload: Record<string, unknown>) {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      saveDraft(payload, draftIdRef.current);
-    }, 10_000);
-  }
-
-  function buildPayload(values: Partial<ComposeFormValues>) {
+  function buildPayload() {
     const current = form.getValues();
     return {
-      from: values.from ?? current.from,
-      to: values.to ?? current.to,
-      cc: (values.cc ?? current.cc) || undefined,
-      bcc: (values.bcc ?? current.bcc) || undefined,
-      subject: values.subject ?? current.subject,
-      body: values.body ?? current.body,
+      from: current.from,
+      to: current.to,
+      cc: current.cc || undefined,
+      bcc: current.bcc || undefined,
+      subject: current.subject,
+      body: current.body,
       attachmentKeys: attachments.map((a) => a.s3Key),
     };
   }
 
-  function handleFieldChange(field: keyof ComposeFormValues, value: string) {
-    scheduleSave(buildPayload({ [field]: value }));
+  async function handleSaveDraft() {
+    await saveDraft(buildPayload(), draftIdRef.current);
   }
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -185,7 +173,6 @@ function ComposeSheetInner({ addresses, initialData, onClose }: ComposeSheetInne
   }
 
   async function handleSend(values: ComposeFormValues) {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
     setIsSending(true);
     setSendError(null);
     try {
@@ -209,6 +196,7 @@ function ComposeSheetInner({ addresses, initialData, onClose }: ComposeSheetInne
         return;
       }
       onClose();
+      router.refresh();
     } catch {
       setSendError('Failed to send email. Please try again.');
     } finally {
@@ -217,11 +205,11 @@ function ComposeSheetInner({ addresses, initialData, onClose }: ComposeSheetInne
   }
 
   async function handleDiscard() {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
     if (draftIdRef.current) {
       await fetch(`/api/drafts/${draftIdRef.current}`, { method: 'DELETE' }).catch(() => null);
     }
     onClose();
+    router.refresh();
   }
 
   function formatSavedAt(date: Date) {
@@ -234,9 +222,6 @@ function ComposeSheetInner({ addresses, initialData, onClose }: ComposeSheetInne
         <div className="flex items-center justify-between pr-8">
           <SheetTitle>New Message</SheetTitle>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {saveStatus === 'saving' && (
-              <span data-testid="save-status-saving">Saving…</span>
-            )}
             {saveStatus === 'saved' && savedAt && (
               <span data-testid="save-status-saved">
                 Draft saved {formatSavedAt(savedAt)}
@@ -263,7 +248,6 @@ function ComposeSheetInner({ addresses, initialData, onClose }: ComposeSheetInne
                     value={field.value}
                     onValueChange={(val) => {
                       field.onChange(val);
-                      handleFieldChange('from', val);
                     }}
                   >
                     <FormControl>
@@ -296,7 +280,6 @@ function ComposeSheetInner({ addresses, initialData, onClose }: ComposeSheetInne
                       placeholder="recipient@example.com"
                       onChange={(e) => {
                         field.onChange(e);
-                        handleFieldChange('to', e.target.value);
                       }}
                       data-testid="compose-to"
                     />
@@ -318,7 +301,6 @@ function ComposeSheetInner({ addresses, initialData, onClose }: ComposeSheetInne
                       placeholder="cc@example.com"
                       onChange={(e) => {
                         field.onChange(e);
-                        handleFieldChange('cc', e.target.value);
                       }}
                       data-testid="compose-cc"
                     />
@@ -340,7 +322,6 @@ function ComposeSheetInner({ addresses, initialData, onClose }: ComposeSheetInne
                       placeholder="bcc@example.com"
                       onChange={(e) => {
                         field.onChange(e);
-                        handleFieldChange('bcc', e.target.value);
                       }}
                       data-testid="compose-bcc"
                     />
@@ -362,7 +343,6 @@ function ComposeSheetInner({ addresses, initialData, onClose }: ComposeSheetInne
                       placeholder="Subject"
                       onChange={(e) => {
                         field.onChange(e);
-                        handleFieldChange('subject', e.target.value);
                       }}
                       data-testid="compose-subject"
                     />
@@ -385,7 +365,6 @@ function ComposeSheetInner({ addresses, initialData, onClose }: ComposeSheetInne
                       className="min-h-[200px] resize-y"
                       onChange={(e) => {
                         field.onChange(e);
-                        handleFieldChange('body', e.target.value);
                       }}
                       data-testid="compose-body"
                     />
@@ -449,6 +428,18 @@ function ComposeSheetInner({ addresses, initialData, onClose }: ComposeSheetInne
               </div>
 
               <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleSaveDraft}
+                  disabled={saveStatus === 'saving'}
+                  className="gap-1"
+                  data-testid="compose-save-draft-button"
+                >
+                  <BookMarked className="h-3.5 w-3.5" />
+                  {saveStatus === 'saving' ? 'Saving…' : 'Save Draft'}
+                </Button>
                 <Button
                   type="button"
                   size="sm"
