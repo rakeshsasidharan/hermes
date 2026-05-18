@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+
 import { useRouter } from 'next/navigation';
 import {
   Table,
@@ -28,9 +28,8 @@ function statusVariant(status: string): 'default' | 'secondary' | 'destructive' 
   return 'destructive';
 }
 
-export function DomainList({ domains: initial }: DomainListProps) {
+export function DomainList({ domains }: DomainListProps) {
   const router = useRouter();
-  const [domains] = useState<Domain[]>(initial);
 
   function refresh() {
     router.refresh();
