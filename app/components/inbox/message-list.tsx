@@ -112,8 +112,9 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 ">
       <FilterBar onFilter={handleFilter} />
+      <div className='border rounded-lg min-h-0 overflow-auto'>
 
       <Table className={isLoading ? 'opacity-50 pointer-events-none' : ''}>
         <TableHeader>
@@ -176,7 +177,7 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
           )}
         </TableBody>
       </Table>
-
+      </div>
       {nextCursor && (
         <div className="flex justify-center">
           <Button variant="outline" size="sm" onClick={handleLoadMore} disabled={isLoading}>

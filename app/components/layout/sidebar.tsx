@@ -202,6 +202,7 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
                   tooltip="Compose"
                   onClick={() => openCompose()}
                   data-testid="compose-button"
+                  variant= "btnDefault"
                 >
                   <PenSquare />
                   <span>Compose</span>
