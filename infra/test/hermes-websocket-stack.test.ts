@@ -56,10 +56,10 @@ describe('HermesWebSocketStack', () => {
   });
 
   describe('WsConnectHandler Lambda', () => {
-    test('creates WsConnectHandler with Node.js 20.x runtime', () => {
+    test('creates WsConnectHandler with Node.js 22.x runtime', () => {
       template.hasResourceProperties('AWS::Lambda::Function', {
         FunctionName: 'hermes-ws-connect',
-        Runtime: 'nodejs20.x',
+        Runtime: 'nodejs22.x',
         Handler: 'index.handler',
       });
     });
@@ -91,10 +91,10 @@ describe('HermesWebSocketStack', () => {
   });
 
   describe('WsDisconnectHandler Lambda', () => {
-    test('creates WsDisconnectHandler with Node.js 20.x runtime', () => {
+    test('creates WsDisconnectHandler with Node.js 22.x runtime', () => {
       template.hasResourceProperties('AWS::Lambda::Function', {
         FunctionName: 'hermes-ws-disconnect',
-        Runtime: 'nodejs20.x',
+        Runtime: 'nodejs22.x',
         Handler: 'index.handler',
       });
     });
