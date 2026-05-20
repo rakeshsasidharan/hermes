@@ -29,7 +29,7 @@ export class HermesWebSocketStack extends cdk.Stack {
 
     const connectHandler = new lambda.Function(this, 'WsConnectHandler', {
       functionName: 'hermes-ws-connect',
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_22_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../lambda/ws-connect')),
       logGroup: connectLogGroup,
@@ -48,7 +48,7 @@ export class HermesWebSocketStack extends cdk.Stack {
 
     const disconnectHandler = new lambda.Function(this, 'WsDisconnectHandler', {
       functionName: 'hermes-ws-disconnect',
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_22_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../lambda/ws-disconnect')),
       logGroup: disconnectLogGroup,

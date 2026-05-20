@@ -89,10 +89,10 @@ describe('HermesEmailStack', () => {
   });
 
   describe('InboundEmailProcessor Lambda', () => {
-    test('creates InboundEmailProcessor with Node.js 20.x runtime', () => {
+    test('creates InboundEmailProcessor with Node.js 22.x runtime', () => {
       template.hasResourceProperties('AWS::Lambda::Function', {
         FunctionName: 'hermes-inbound-email-processor',
-        Runtime: 'nodejs20.x',
+        Runtime: 'nodejs22.x',
         Handler: 'index.handler',
       });
     });

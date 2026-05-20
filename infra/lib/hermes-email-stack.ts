@@ -77,7 +77,7 @@ export class HermesEmailStack extends cdk.Stack {
     const lambdaDir = path.join(__dirname, '../lambda/inbound-email-processor');
     this.inboundEmailProcessor = new lambda.Function(this, 'InboundEmailProcessor', {
       functionName: 'hermes-inbound-email-processor',
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_22_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset(lambdaDir, {
         bundling: {
@@ -95,7 +95,7 @@ export class HermesEmailStack extends cdk.Stack {
               }
             },
           },
-          image: lambda.Runtime.NODEJS_20_X.bundlingImage,
+          image: lambda.Runtime.NODEJS_22_X.bundlingImage,
           command: [
             'bash',
             '-c',
