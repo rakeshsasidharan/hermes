@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import Link, { useLinkStatus } from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import Link, { useLinkStatus } from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -19,9 +19,9 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarRail,
-} from '@/components/ui/sidebar';
-import { useWs } from '@/components/ws-context';
-import { useCompose } from '@/components/compose-context';
+} from "@/components/ui/sidebar";
+import { useWs } from "@/components/ws-context";
+import { useCompose } from "@/components/compose-context";
 import {
   Mail,
   Settings,
@@ -34,8 +34,8 @@ import {
   BookMarked,
   ChevronRight,
   Loader2,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Address {
   email: string;
@@ -49,7 +49,13 @@ interface AppSidebarProps {
 }
 
 // Must be rendered inside <Link> so useLinkStatus() has context
-function SubNavLinkInner({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
+function SubNavLinkInner({
+  icon: Icon,
+  label,
+}: {
+  icon: React.ElementType;
+  label: string;
+}) {
   const { pending } = useLinkStatus();
   return (
     <>
@@ -154,8 +160,8 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
   }
 
   async function handleSignOut() {
-    await fetch('/api/auth/signout', { method: 'POST' });
-    router.push('/login');
+    await fetch("/api/auth/signout", { method: "POST" });
+    router.push("/login");
   }
 
   return (
@@ -167,13 +173,20 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
               size="lg"
               asChild
               tooltip="Hermes"
-              className="group-data-[collapsible=icon]:justify-center"
             >
               <Link href="/">
-                <img src="/icon.svg" alt="Hermes" className="size-5 shrink-0" />
-                <span className="text-base font-semibold group-data-[collapsible=icon]:hidden">
-                  Hermes
-                </span>
+                <div className="flex aspect-square shrink-0 items-center justify-center bg-primary-background ">
+                  <img
+                    src="/icon.svg"
+                    alt="Hermes"
+                    className="size-8 shrink-0 rounded-lg"
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5 leading-none">
+                  <span className="text-base font-semibold">
+                    Hermes
+                  </span>
+                </div>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -204,7 +217,9 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
             <SidebarMenu>
               {addresses.length === 0 && (
                 <SidebarMenuItem>
-                  <span className="px-2 py-1.5 text-sm text-muted-foreground">No addresses yet</span>
+                  <span className="px-2 py-1.5 text-sm text-muted-foreground">
+                    No addresses yet
+                  </span>
                 </SidebarMenuItem>
               )}
               {addresses.map((addr) => {
@@ -214,7 +229,8 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
                 const inboxActive = pathname.startsWith(inboxHref);
                 const sentActive = pathname.startsWith(sentHref);
                 const draftsActive = pathname.startsWith(draftsHref);
-                const isAddressActive = inboxActive || sentActive || draftsActive;
+                const isAddressActive =
+                  inboxActive || sentActive || draftsActive;
                 const count = unreadCounts.get(addr.email) ?? 0;
                 const isOpen = openAddresses.has(addr.email);
 
@@ -227,11 +243,13 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
                     >
                       <Mail />
                       <span className="truncate">{addr.email}</span>
-                      {count > 0 && <SidebarMenuBadge>{count}</SidebarMenuBadge>}
+                      {count > 0 && (
+                        <SidebarMenuBadge>{count}</SidebarMenuBadge>
+                      )}
                       <ChevronRight
                         className={cn(
-                          'ml-auto shrink-0 transition-transform duration-200 group-data-[collapsible=icon]:hidden',
-                          isOpen && 'rotate-90',
+                          "ml-auto shrink-0 transition-transform duration-200 group-data-[collapsible=icon]:hidden",
+                          isOpen && "rotate-90",
                         )}
                       />
                     </SidebarMenuButton>
@@ -278,7 +296,7 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
                   href="/addresses"
                   icon={AtSign}
                   label="Addresses"
-                  isActive={pathname === '/addresses'}
+                  isActive={pathname === "/addresses"}
                 />
               </SidebarMenuItem>
               <SidebarMenuItem>
@@ -286,7 +304,7 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
                   href="/domains"
                   icon={Globe}
                   label="Domains"
-                  isActive={pathname === '/domains'}
+                  isActive={pathname === "/domains"}
                 />
               </SidebarMenuItem>
               <SidebarMenuItem>
@@ -294,7 +312,7 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
                   href="/settings"
                   icon={Settings}
                   label="Settings"
-                  isActive={pathname === '/settings'}
+                  isActive={pathname === "/settings"}
                 />
               </SidebarMenuItem>
             </SidebarMenu>
