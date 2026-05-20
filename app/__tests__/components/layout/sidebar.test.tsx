@@ -1,6 +1,7 @@
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Sidebar } from '@/components/layout/sidebar';
+import { AppSidebar } from '@/components/layout/sidebar';
+import { SidebarProvider } from '@/components/ui/sidebar';
 import type { WsNewMessageEvent } from '@/lib/ws';
 
 const mockPush = jest.fn();
@@ -56,6 +57,30 @@ const ADDRESSES = [
   { email: 'info@example.com', domain: 'example.com', status: 'active', unreadCount: 0 },
 ];
 
+function renderSidebar(addresses = ADDRESSES) {
+  return render(
+    <SidebarProvider>
+      <AppSidebar addresses={addresses} />
+    </SidebarProvider>,
+  );
+}
+
+beforeAll(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: jest.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    })),
+  });
+});
+
 beforeEach(() => {
   global.fetch = jest.fn();
   mockPathname.mockReturnValue('/');
@@ -69,25 +94,25 @@ afterEach(() => {
   jest.clearAllMocks();
 });
 
-describe('Sidebar', () => {
+describe('AppSidebar', () => {
   test('renders address links', () => {
-    render(<Sidebar addresses={ADDRESSES} />);
+    renderSidebar();
     expect(screen.getByText('hello@example.com')).toBeInTheDocument();
     expect(screen.getByText('info@example.com')).toBeInTheDocument();
   });
 
   test('shows unread count badge when unreadCount > 0', () => {
-    render(<Sidebar addresses={ADDRESSES} />);
+    renderSidebar();
     expect(screen.getByText('3')).toBeInTheDocument();
   });
 
   test('shows empty state when no addresses', () => {
-    render(<Sidebar addresses={[]} />);
+    renderSidebar([]);
     expect(screen.getByText(/no addresses yet/i)).toBeInTheDocument();
   });
 
   test('renders Compose, Addresses, Domains, Settings links', () => {
-    render(<Sidebar addresses={ADDRESSES} />);
+    renderSidebar();
     expect(screen.getByText('Compose')).toBeInTheDocument();
     expect(screen.getByText('Addresses')).toBeInTheDocument();
     expect(screen.getByText('Domains')).toBeInTheDocument();
@@ -95,77 +120,77 @@ describe('Sidebar', () => {
   });
 
   test('renders Drafts sub-nav for each address', () => {
-    render(<Sidebar addresses={ADDRESSES} />);
+    renderSidebar();
     expect(screen.getAllByText('Drafts')).toHaveLength(ADDRESSES.length);
   });
 
   test('Drafts sub-link points to /drafts/[address]', () => {
-    render(<Sidebar addresses={ADDRESSES} />);
+    renderSidebar();
     const draftsLinks = screen.getAllByRole('link', { name: /^drafts$/i });
     expect(draftsLinks[0]).toHaveAttribute('href', '/drafts/hello%40example.com');
   });
 
-  test('Drafts sub-link has active style when on drafts route', () => {
+  test('Drafts sub-link has active state when on drafts route', () => {
     mockPathname.mockReturnValue('/drafts/hello%40example.com');
-    render(<Sidebar addresses={ADDRESSES} />);
+    renderSidebar();
     const draftsLinks = screen.getAllByRole('link', { name: /^drafts$/i });
-    expect(draftsLinks[0].firstElementChild?.className).toContain('bg-accent');
+    expect(draftsLinks[0]).toHaveAttribute('data-active', 'true');
   });
 
   test('Addresses link points to /addresses', () => {
-    render(<Sidebar addresses={ADDRESSES} />);
+    renderSidebar();
     const link = screen.getByRole('link', { name: /^addresses$/i });
     expect(link).toHaveAttribute('href', '/addresses');
   });
 
-  test('Addresses link has active style when pathname is /addresses', () => {
+  test('Addresses link has active state when pathname is /addresses', () => {
     mockPathname.mockReturnValue('/addresses');
-    render(<Sidebar addresses={ADDRESSES} />);
+    renderSidebar();
     const link = screen.getByRole('link', { name: /^addresses$/i });
-    expect(link.firstElementChild?.className).toContain('bg-accent');
+    expect(link).toHaveAttribute('data-active', 'true');
   });
 
   test('renders Inbox and Sent sub-nav for each address', () => {
-    render(<Sidebar addresses={ADDRESSES} />);
+    renderSidebar();
     expect(screen.getAllByText('Inbox')).toHaveLength(ADDRESSES.length);
     expect(screen.getAllByText('Sent')).toHaveLength(ADDRESSES.length);
   });
 
   test('Inbox sub-link points to /inbox/[address]', () => {
-    render(<Sidebar addresses={ADDRESSES} />);
+    renderSidebar();
     const inboxLinks = screen.getAllByRole('link', { name: /^inbox$/i });
     expect(inboxLinks[0]).toHaveAttribute('href', '/inbox/hello%40example.com');
   });
 
   test('Sent sub-link points to /sent/[address]', () => {
-    render(<Sidebar addresses={ADDRESSES} />);
+    renderSidebar();
     const sentLinks = screen.getAllByRole('link', { name: /^sent$/i });
     expect(sentLinks[0]).toHaveAttribute('href', '/sent/hello%40example.com');
   });
 
-  test('Inbox sub-link has active style when on inbox route', () => {
+  test('Inbox sub-link has active state when on inbox route', () => {
     mockPathname.mockReturnValue('/inbox/hello%40example.com');
-    render(<Sidebar addresses={ADDRESSES} />);
+    renderSidebar();
     const inboxLinks = screen.getAllByRole('link', { name: /^inbox$/i });
-    expect(inboxLinks[0].firstElementChild?.className).toContain('bg-accent');
+    expect(inboxLinks[0]).toHaveAttribute('data-active', 'true');
   });
 
-  test('Sent sub-link has active style when on sent route', () => {
+  test('Sent sub-link has active state when on sent route', () => {
     mockPathname.mockReturnValue('/sent/hello%40example.com');
-    render(<Sidebar addresses={ADDRESSES} />);
+    renderSidebar();
     const sentLinks = screen.getAllByRole('link', { name: /^sent$/i });
-    expect(sentLinks[0].firstElementChild?.className).toContain('bg-accent');
+    expect(sentLinks[0]).toHaveAttribute('data-active', 'true');
   });
 
   test('Sent sub-link stays active when viewing a sent message detail', () => {
     mockPathname.mockReturnValue('/sent/hello%40example.com/msg-123');
-    render(<Sidebar addresses={ADDRESSES} />);
+    renderSidebar();
     const sentLinks = screen.getAllByRole('link', { name: /^sent$/i });
-    expect(sentLinks[0].firstElementChild?.className).toContain('bg-accent');
+    expect(sentLinks[0]).toHaveAttribute('data-active', 'true');
   });
 
   test('increments unread badge when WebSocket new_message event arrives', async () => {
-    render(<Sidebar addresses={ADDRESSES} />);
+    renderSidebar();
 
     act(() => {
       wsHandler?.({
@@ -189,7 +214,7 @@ describe('Sidebar', () => {
 
   test('Compose button opens compose sheet via context', async () => {
     const user = userEvent.setup();
-    render(<Sidebar addresses={ADDRESSES} />);
+    renderSidebar();
 
     await user.click(screen.getByTestId('compose-button'));
 
@@ -199,7 +224,7 @@ describe('Sidebar', () => {
   test('calls sign out on button click', async () => {
     (global.fetch as jest.Mock).mockResolvedValue({ ok: true });
     const user = userEvent.setup();
-    render(<Sidebar addresses={ADDRESSES} />);
+    renderSidebar();
 
     await user.click(screen.getByRole('button', { name: /sign out/i }));
 
@@ -207,5 +232,17 @@ describe('Sidebar', () => {
       expect(global.fetch).toHaveBeenCalledWith('/api/auth/signout', { method: 'POST' });
       expect(mockPush).toHaveBeenCalledWith('/login');
     });
+  });
+
+  test('collapses email address dropdown when header is clicked again', async () => {
+    const user = userEvent.setup();
+    renderSidebar();
+
+    expect(screen.getAllByText('Inbox')).toHaveLength(ADDRESSES.length);
+
+    const addressButton = screen.getByText('hello@example.com').closest('button');
+    await user.click(addressButton!);
+
+    expect(screen.getAllByText('Inbox')).toHaveLength(ADDRESSES.length - 1);
   });
 });
