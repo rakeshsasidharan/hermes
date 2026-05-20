@@ -1,7 +1,8 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { Sidebar } from '@/components/layout/sidebar';
+import { AppSidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { WebSocketProvider } from '@/components/ws-context';
 import { ComposeProvider } from '@/components/compose-context';
 import { ComposeSheet } from '@/components/messages/compose-sheet';
@@ -44,13 +45,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <WebSocketProvider token={token} wsEndpoint={wsEndpoint}>
       <ComposeProvider>
-        <div className="flex h-screen overflow-hidden">
-          <Sidebar addresses={addresses} />
-          <div className="flex flex-1 flex-col overflow-hidden">
+        <SidebarProvider className="h-svh">
+          <AppSidebar addresses={addresses} />
+          <SidebarInset>
             <Topbar />
-            <main className="flex-1 overflow-y-auto px-6 pb-6 pt-3">{children}</main>
-          </div>
-        </div>
+            <div className="flex-1 overflow-y-auto px-6 pb-6 pt-3">{children}</div>
+          </SidebarInset>
+        </SidebarProvider>
         <ComposeSheet addresses={addresses} />
       </ComposeProvider>
     </WebSocketProvider>
