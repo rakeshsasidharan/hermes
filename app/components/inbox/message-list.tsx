@@ -55,12 +55,18 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
     if (direction !== 'inbound') return;
     return subscribe((event) => {
       if (event.address.toLowerCase() !== address.toLowerCase()) return;
-      setMessages((prev) => {
-        if (prev.some((m) => m.messageId === event.message.messageId)) return prev;
-        // Normalise the WS payload into the full Message shape expected by the list.
-        const incoming: Message = { ...event.message, from: event.message.sender };
-        return [incoming, ...prev];
-      });
+      // The WS payload only carries the messageId; fetch the full record.
+      fetch(`/api/messages/${encodeURIComponent(event.messageId)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          const incoming: Message = data?.message;
+          if (!incoming) return;
+          setMessages((prev) => {
+            if (prev.some((m) => m.messageId === incoming.messageId)) return prev;
+            return [incoming, ...prev];
+          });
+        })
+        .catch(() => null);
     });
   }, [subscribe, address, direction]);
 

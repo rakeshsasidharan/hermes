@@ -9,9 +9,6 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
 }));
 
-jest.mock('next-themes', () => ({
-  useTheme: () => ({ resolvedTheme: 'light' }),
-}));
 
 beforeEach(() => {
   global.fetch = jest.fn();

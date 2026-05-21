@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useTheme } from 'next-themes';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -54,9 +53,6 @@ type ComposerMode = 'reply' | 'replyAll' | 'forward' | null;
 export function MessageDetail({ message, initialHtmlBody, initialTextBody, initialDraftId, initialComposerMode }: MessageDetailProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
-
   const folder = pathname.split('/')[1]; // 'inbox' | 'sent' | 'drafts' | 'junk' | 'trash'
   const isSent = folder === 'sent';
   const showReadToggle = folder === 'inbox' || folder === 'junk';
@@ -67,16 +63,6 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
   const [isRead, setIsRead] = useState(message.isRead);
   const [composerMode, setComposerMode] = useState<ComposerMode>(initialComposerMode ?? null);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  // Re-invert images/videos inside the iframe so they look natural after the outer dark filter.
-  const processedHtmlBody = useMemo(() => {
-    if (!htmlBody || !isDark) return htmlBody;
-    const injection = '<style>img,video{filter:invert(1) hue-rotate(180deg)}</style>';
-    const headMatch = /<head[^>]*>/i.exec(htmlBody);
-    return headMatch
-      ? htmlBody.replace(headMatch[0], `${headMatch[0]}${injection}`)
-      : `${injection}${htmlBody}`;
-  }, [htmlBody, isDark]);
 
   function dispatchReadEvent(messageId: string, isRead: boolean) {
     window.dispatchEvent(new CustomEvent('hermes:readstatus', { detail: { messageId, isRead } }));
@@ -270,10 +256,9 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
               <div>
                 {htmlBody ? (
                   <iframe
-                    srcDoc={processedHtmlBody ?? ''}
+                    srcDoc={htmlBody}
                     sandbox="allow-same-origin"
                     className="w-full min-h-96 border-0"
-                    style={isDark ? { filter: 'invert(1) hue-rotate(180deg)' } : undefined}
                     title="Email body"
                     data-testid="html-body-frame"
                   />

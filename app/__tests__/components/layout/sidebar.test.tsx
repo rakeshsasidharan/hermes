@@ -180,14 +180,7 @@ describe('AppSidebar', () => {
       wsHandler?.({
         type: 'new_message',
         address: 'info@example.com',
-        message: {
-          messageId: 'msg-new',
-          address: 'info@example.com',
-          sender: 'x@test.com',
-          subject: 'New',
-          receivedAt: new Date().toISOString(),
-          isRead: false,
-        },
+        messageId: 'msg-new',
       });
     });
 

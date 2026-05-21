@@ -110,42 +110,47 @@ describe('MessageList — inbox (inbound)', () => {
     expect(screen.getByLabelText('Unread')).toBeInTheDocument();
   });
 
-  test('prepends new message from WebSocket event', async () => {
+  test('prepends new message from WebSocket event by fetching the full record', async () => {
+    const wsMessage = {
+      messageId: 'msg-ws',
+      address: 'hello@example.com',
+      from: 'carol@test.com',
+      sender: 'carol@test.com',
+      subject: 'Real-time',
+      receivedAt: new Date().toISOString(),
+      isRead: false,
+    };
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ message: wsMessage }),
+    });
     render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
     act(() => {
-      wsHandler?.({
-        type: 'new_message',
-        address: 'hello@example.com',
-        message: {
-          messageId: 'msg-ws',
-          address: 'hello@example.com',
-          sender: 'carol@test.com',
-          subject: 'Real-time',
-          receivedAt: new Date().toISOString(),
-          isRead: false,
-        },
-      });
+      wsHandler?.({ type: 'new_message', address: 'hello@example.com', messageId: 'msg-ws' });
     });
     await waitFor(() => expect(screen.getByText('carol@test.com')).toBeInTheDocument());
+    expect(global.fetch).toHaveBeenCalledWith('/api/messages/msg-ws');
   });
 
   test('ignores WebSocket events for a different address', async () => {
     render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
     act(() => {
-      wsHandler?.({
-        type: 'new_message',
-        address: 'other@example.com',
-        message: { messageId: 'x', address: 'other@example.com', sender: 'dave@test.com', subject: 'No', receivedAt: new Date().toISOString(), isRead: false },
-      });
+      wsHandler?.({ type: 'new_message', address: 'other@example.com', messageId: 'x' });
     });
+    expect(global.fetch).not.toHaveBeenCalled();
     expect(screen.queryByText('dave@test.com')).not.toBeInTheDocument();
   });
 
   test('does not duplicate a message already present', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ message: INBOUND_MESSAGES[0] }),
+    });
     render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
     act(() => {
-      wsHandler?.({ type: 'new_message', address: 'hello@example.com', message: { ...INBOUND_MESSAGES[0] } });
+      wsHandler?.({ type: 'new_message', address: 'hello@example.com', messageId: 'msg-1' });
     });
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
     expect(screen.getAllByText('alice@test.com')).toHaveLength(1);
   });
 });
@@ -217,21 +222,23 @@ describe('MessageList — hermes:readstatus event', () => {
     });
   });
 
-  test('WS message sender is displayed as from field', async () => {
-    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
-    act(() => {
-      wsHandler?.({
-        type: 'new_message',
-        address: 'hello@example.com',
+  test('WS message from field is displayed after fetch', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
         message: {
           messageId: 'msg-ws2',
           address: 'hello@example.com',
-          sender: 'ws-sender@test.com',
+          from: 'ws-sender@test.com',
           subject: 'WS Subject',
           receivedAt: new Date().toISOString(),
           isRead: false,
         },
-      });
+      }),
+    });
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+    act(() => {
+      wsHandler?.({ type: 'new_message', address: 'hello@example.com', messageId: 'msg-ws2' });
     });
     await waitFor(() => expect(screen.getByText('ws-sender@test.com')).toBeInTheDocument());
   });
