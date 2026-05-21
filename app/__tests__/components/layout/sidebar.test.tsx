@@ -25,9 +25,7 @@ jest.mock('next/link', () => {
 let wsHandler: ((event: WsNewMessageEvent) => void) | null = null;
 const mockSubscribe = jest.fn((handler: (event: WsNewMessageEvent) => void) => {
   wsHandler = handler;
-  return () => {
-    wsHandler = null;
-  };
+  return () => { wsHandler = null; };
 });
 
 jest.mock('@/components/ws-context', () => ({
@@ -95,15 +93,15 @@ afterEach(() => {
 });
 
 describe('AppSidebar', () => {
-  test('renders address links', () => {
+  test('shows selected address in dropdown trigger', () => {
+    mockPathname.mockReturnValue('/inbox/hello%40example.com');
     renderSidebar();
     expect(screen.getByText('hello@example.com')).toBeInTheDocument();
-    expect(screen.getByText('info@example.com')).toBeInTheDocument();
   });
 
-  test('shows unread count badge when unreadCount > 0', () => {
+  test('defaults to first address when not on a mailbox route', () => {
     renderSidebar();
-    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.getByText('hello@example.com')).toBeInTheDocument();
   });
 
   test('shows empty state when no addresses', () => {
@@ -111,85 +109,71 @@ describe('AppSidebar', () => {
     expect(screen.getByText(/no addresses yet/i)).toBeInTheDocument();
   });
 
-  test('renders Compose, Addresses, Domains, Settings links', () => {
+  test('renders Compose button', () => {
     renderSidebar();
     expect(screen.getByText('Compose')).toBeInTheDocument();
-    expect(screen.getByText('Addresses')).toBeInTheDocument();
-    expect(screen.getByText('Domains')).toBeInTheDocument();
-    expect(screen.getByText('Settings')).toBeInTheDocument();
   });
 
-  test('renders Drafts sub-nav for each address', () => {
-    renderSidebar();
-    expect(screen.getAllByText('Drafts')).toHaveLength(ADDRESSES.length);
-  });
-
-  test('Drafts sub-link points to /drafts/[address]', () => {
-    renderSidebar();
-    const draftsLinks = screen.getAllByRole('link', { name: /^drafts$/i });
-    expect(draftsLinks[0]).toHaveAttribute('href', '/drafts/hello%40example.com');
-  });
-
-  test('Drafts sub-link has active state when on drafts route', () => {
-    mockPathname.mockReturnValue('/drafts/hello%40example.com');
-    renderSidebar();
-    const draftsLinks = screen.getAllByRole('link', { name: /^drafts$/i });
-    expect(draftsLinks[0]).toHaveAttribute('data-active', 'true');
-  });
-
-  test('Addresses link points to /addresses', () => {
-    renderSidebar();
-    const link = screen.getByRole('link', { name: /^addresses$/i });
-    expect(link).toHaveAttribute('href', '/addresses');
-  });
-
-  test('Addresses link has active state when pathname is /addresses', () => {
-    mockPathname.mockReturnValue('/addresses');
-    renderSidebar();
-    const link = screen.getByRole('link', { name: /^addresses$/i });
-    expect(link).toHaveAttribute('data-active', 'true');
-  });
-
-  test('renders Inbox and Sent sub-nav for each address', () => {
-    renderSidebar();
-    expect(screen.getAllByText('Inbox')).toHaveLength(ADDRESSES.length);
-    expect(screen.getAllByText('Sent')).toHaveLength(ADDRESSES.length);
-  });
-
-  test('Inbox sub-link points to /inbox/[address]', () => {
-    renderSidebar();
-    const inboxLinks = screen.getAllByRole('link', { name: /^inbox$/i });
-    expect(inboxLinks[0]).toHaveAttribute('href', '/inbox/hello%40example.com');
-  });
-
-  test('Sent sub-link points to /sent/[address]', () => {
-    renderSidebar();
-    const sentLinks = screen.getAllByRole('link', { name: /^sent$/i });
-    expect(sentLinks[0]).toHaveAttribute('href', '/sent/hello%40example.com');
-  });
-
-  test('Inbox sub-link has active state when on inbox route', () => {
+  test('renders folder links for the selected address', () => {
     mockPathname.mockReturnValue('/inbox/hello%40example.com');
     renderSidebar();
-    const inboxLinks = screen.getAllByRole('link', { name: /^inbox$/i });
-    expect(inboxLinks[0]).toHaveAttribute('data-active', 'true');
+    expect(screen.getByText('Inbox')).toBeInTheDocument();
+    expect(screen.getByText('Drafts')).toBeInTheDocument();
+    expect(screen.getByText('Sent')).toBeInTheDocument();
+    expect(screen.getByText('Junk')).toBeInTheDocument();
+    expect(screen.getByText('Trash')).toBeInTheDocument();
   });
 
-  test('Sent sub-link has active state when on sent route', () => {
+  test('Inbox link points to /inbox/[selectedAddress]', () => {
+    mockPathname.mockReturnValue('/inbox/hello%40example.com');
+    renderSidebar();
+    expect(screen.getByTestId('folder-link-inbox')).toHaveAttribute('href', '/inbox/hello%40example.com');
+  });
+
+  test('Drafts link points to /drafts/[selectedAddress]', () => {
+    mockPathname.mockReturnValue('/inbox/hello%40example.com');
+    renderSidebar();
+    expect(screen.getByTestId('folder-link-drafts')).toHaveAttribute('href', '/drafts/hello%40example.com');
+  });
+
+  test('Sent link points to /sent/[selectedAddress]', () => {
+    mockPathname.mockReturnValue('/inbox/hello%40example.com');
+    renderSidebar();
+    expect(screen.getByTestId('folder-link-sent')).toHaveAttribute('href', '/sent/hello%40example.com');
+  });
+
+  test('Inbox link has active state when on inbox route', () => {
+    mockPathname.mockReturnValue('/inbox/hello%40example.com');
+    renderSidebar();
+    expect(screen.getByTestId('folder-link-inbox')).toHaveAttribute('data-active', 'true');
+  });
+
+  test('Drafts link has active state when on drafts route', () => {
+    mockPathname.mockReturnValue('/drafts/hello%40example.com');
+    renderSidebar();
+    expect(screen.getByTestId('folder-link-drafts')).toHaveAttribute('data-active', 'true');
+  });
+
+  test('Sent link has active state when on sent route', () => {
     mockPathname.mockReturnValue('/sent/hello%40example.com');
     renderSidebar();
-    const sentLinks = screen.getAllByRole('link', { name: /^sent$/i });
-    expect(sentLinks[0]).toHaveAttribute('data-active', 'true');
+    expect(screen.getByTestId('folder-link-sent')).toHaveAttribute('data-active', 'true');
   });
 
-  test('Sent sub-link stays active when viewing a sent message detail', () => {
+  test('Sent link stays active when viewing a sent message detail', () => {
     mockPathname.mockReturnValue('/sent/hello%40example.com/msg-123');
     renderSidebar();
-    const sentLinks = screen.getAllByRole('link', { name: /^sent$/i });
-    expect(sentLinks[0]).toHaveAttribute('data-active', 'true');
+    expect(screen.getByTestId('folder-link-sent')).toHaveAttribute('data-active', 'true');
+  });
+
+  test('shows unread badge for selected address inbox count', () => {
+    mockPathname.mockReturnValue('/inbox/hello%40example.com');
+    renderSidebar();
+    expect(screen.getByText('3')).toBeInTheDocument();
   });
 
   test('increments unread badge when WebSocket new_message event arrives', async () => {
+    mockPathname.mockReturnValue('/inbox/info%40example.com');
     renderSidebar();
 
     act(() => {
@@ -212,13 +196,14 @@ describe('AppSidebar', () => {
     });
   });
 
-  test('Compose button opens compose sheet via context', async () => {
+  test('Compose button calls openCompose with selected address', async () => {
+    mockPathname.mockReturnValue('/inbox/hello%40example.com');
     const user = userEvent.setup();
     renderSidebar();
 
     await user.click(screen.getByTestId('compose-button'));
 
-    expect(mockOpenCompose).toHaveBeenCalledTimes(1);
+    expect(mockOpenCompose).toHaveBeenCalledWith({ from: 'hello@example.com' });
   });
 
   test('calls sign out on button click', async () => {
@@ -232,17 +217,5 @@ describe('AppSidebar', () => {
       expect(global.fetch).toHaveBeenCalledWith('/api/auth/signout', { method: 'POST' });
       expect(mockPush).toHaveBeenCalledWith('/login');
     });
-  });
-
-  test('collapses email address dropdown when header is clicked again', async () => {
-    const user = userEvent.setup();
-    renderSidebar();
-
-    expect(screen.getAllByText('Inbox')).toHaveLength(ADDRESSES.length);
-
-    const addressButton = screen.getByText('hello@example.com').closest('button');
-    await user.click(addressButton!);
-
-    expect(screen.getAllByText('Inbox')).toHaveLength(ADDRESSES.length - 1);
   });
 });

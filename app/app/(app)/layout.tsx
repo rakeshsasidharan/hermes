@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { AppSidebar } from '@/components/layout/sidebar';
-import { Topbar } from '@/components/layout/topbar';
+import { ConditionalLayout } from '@/components/layout/conditional-layout';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { WebSocketProvider } from '@/components/ws-context';
 import { ComposeProvider } from '@/components/compose-context';
@@ -47,9 +47,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <ComposeProvider>
         <SidebarProvider className="h-svh">
           <AppSidebar addresses={addresses} />
-          <SidebarInset>
-            <Topbar />
-            <div className="flex-1 overflow-y-auto px-6 pb-6 pt-3">{children}</div>
+          <SidebarInset className="flex flex-col min-h-0">
+            <ConditionalLayout>{children}</ConditionalLayout>
           </SidebarInset>
         </SidebarProvider>
         <ComposeSheet addresses={addresses} />
