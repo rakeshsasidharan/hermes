@@ -30,6 +30,7 @@ jest.mock('@aws-sdk/lib-dynamodb', () => ({
   ScanCommand: jest.fn((p: unknown) => p),
   PutCommand: jest.fn((p: unknown) => p),
   GetCommand: jest.fn((p: unknown) => p),
+  QueryCommand: jest.fn((p: unknown) => p),
 }));
 
 import { requireAuth, AuthError } from '@/lib/auth/require-auth';
@@ -62,11 +63,16 @@ beforeEach(() => {
 // ── GET /api/addresses ──────────────────────────────────────────────────────
 
 describe('GET /api/addresses', () => {
+  function setupGetMock(addresses: unknown[], unreadCount = 0) {
+    mockDynamoSend.mockImplementation((cmd: Record<string, unknown>) => {
+      if ('IndexName' in cmd) return Promise.resolve({ Count: unreadCount });
+      return Promise.resolve({ Items: addresses });
+    });
+  }
+
   test('returns active addresses for authenticated request', async () => {
     mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
-    mockDynamoSend.mockResolvedValue({
-      Items: [{ email: 'hello@example.com', domain: 'example.com', status: 'active' }],
-    });
+    setupGetMock([{ email: 'hello@example.com', domain: 'example.com', status: 'active' }]);
 
     const res = await GET(makeGetReq());
     const body = await res.json();
@@ -76,9 +82,19 @@ describe('GET /api/addresses', () => {
     expect(body.addresses[0].email).toBe('hello@example.com');
   });
 
+  test('includes unreadCount from messages table', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+    setupGetMock([{ email: 'hello@example.com', domain: 'example.com', status: 'active' }], 3);
+
+    const res = await GET(makeGetReq());
+    const body = await res.json();
+
+    expect(body.addresses[0].unreadCount).toBe(3);
+  });
+
   test('returns empty list when no addresses exist', async () => {
     mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
-    mockDynamoSend.mockResolvedValue({ Items: [] });
+    setupGetMock([]);
 
     const res = await GET(makeGetReq());
     const body = await res.json();
@@ -89,7 +105,7 @@ describe('GET /api/addresses', () => {
 
   test('filters out soft-deleted addresses via FilterExpression', async () => {
     mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
-    mockDynamoSend.mockResolvedValue({ Items: [] });
+    setupGetMock([]);
 
     await GET(makeGetReq());
 
