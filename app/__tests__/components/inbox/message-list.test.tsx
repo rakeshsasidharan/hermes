@@ -187,6 +187,56 @@ describe('MessageList — sent (outbound)', () => {
   });
 });
 
+describe('MessageList — hermes:readstatus event', () => {
+  test('clears unread badge when hermes:readstatus fires with isRead=true', async () => {
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+    expect(screen.getByLabelText('Unread')).toBeInTheDocument();
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('hermes:readstatus', { detail: { messageId: 'msg-2', isRead: true } }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText('Unread')).not.toBeInTheDocument();
+    });
+  });
+
+  test('restores unread badge when hermes:readstatus fires with isRead=false', async () => {
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('hermes:readstatus', { detail: { messageId: 'msg-1', isRead: false } }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByLabelText('Unread')).toHaveLength(2);
+    });
+  });
+
+  test('WS message sender is displayed as from field', async () => {
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+    act(() => {
+      wsHandler?.({
+        type: 'new_message',
+        address: 'hello@example.com',
+        message: {
+          messageId: 'msg-ws2',
+          address: 'hello@example.com',
+          sender: 'ws-sender@test.com',
+          subject: 'WS Subject',
+          receivedAt: new Date().toISOString(),
+          isRead: false,
+        },
+      });
+    });
+    await waitFor(() => expect(screen.getByText('ws-sender@test.com')).toBeInTheDocument());
+  });
+});
+
 describe('MessageList — shared', () => {
   test('shows empty state when no messages', () => {
     render(<MessageList {...DEFAULT_INBOUND_PROPS} initialMessages={[]} />);

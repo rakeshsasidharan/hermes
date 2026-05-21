@@ -54,13 +54,26 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
   useEffect(() => {
     if (direction !== 'inbound') return;
     return subscribe((event) => {
-      if (event.address !== address) return;
+      if (event.address.toLowerCase() !== address.toLowerCase()) return;
       setMessages((prev) => {
         if (prev.some((m) => m.messageId === event.message.messageId)) return prev;
-        return [event.message, ...prev];
+        // Normalise the WS payload into the full Message shape expected by the list.
+        const incoming: Message = { ...event.message, from: event.message.sender };
+        return [incoming, ...prev];
       });
     });
   }, [subscribe, address, direction]);
+
+  useEffect(() => {
+    function onReadStatus(e: Event) {
+      const { messageId, isRead } = (e as CustomEvent<{ messageId: string; isRead: boolean }>).detail;
+      setMessages((prev) =>
+        prev.map((m) => m.messageId === messageId ? { ...m, isRead } : m),
+      );
+    }
+    window.addEventListener('hermes:readstatus', onReadStatus);
+    return () => window.removeEventListener('hermes:readstatus', onReadStatus);
+  }, []);
 
   const fetchMessages = useCallback(async (cursor?: string) => {
     setIsLoading(true);

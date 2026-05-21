@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -53,7 +54,12 @@ type ComposerMode = 'reply' | 'replyAll' | 'forward' | null;
 export function MessageDetail({ message, initialHtmlBody, initialTextBody, initialDraftId, initialComposerMode }: MessageDetailProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const isSent = pathname.startsWith('/sent');
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+
+  const folder = pathname.split('/')[1]; // 'inbox' | 'sent' | 'drafts' | 'junk' | 'trash'
+  const isSent = folder === 'sent';
+  const showReadToggle = folder === 'inbox' || folder === 'junk';
   const listHref = pathname.split('/').slice(0, 3).join('/');
 
   const [htmlBody] = useState<string | null>(initialHtmlBody ?? null);
@@ -62,17 +68,33 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
   const [composerMode, setComposerMode] = useState<ComposerMode>(initialComposerMode ?? null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Re-invert images/videos inside the iframe so they look natural after the outer dark filter.
+  const processedHtmlBody = useMemo(() => {
+    if (!htmlBody || !isDark) return htmlBody;
+    const injection = '<style>img,video{filter:invert(1) hue-rotate(180deg)}</style>';
+    const headMatch = /<head[^>]*>/i.exec(htmlBody);
+    return headMatch
+      ? htmlBody.replace(headMatch[0], `${headMatch[0]}${injection}`)
+      : `${injection}${htmlBody}`;
+  }, [htmlBody, isDark]);
+
+  function dispatchReadEvent(messageId: string, isRead: boolean) {
+    window.dispatchEvent(new CustomEvent('hermes:readstatus', { detail: { messageId, isRead } }));
+  }
+
   useEffect(() => {
-    if (!message.isRead) {
-      fetch(`/api/messages/${message.messageId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isRead: true }),
-      }).then((r) => {
-        if (r.ok) setIsRead(true);
-      }).catch(() => null);
-    }
-  }, [message.messageId, message.isRead]);
+    if (!showReadToggle || message.isRead) return;
+    fetch(`/api/messages/${message.messageId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isRead: true }),
+    }).then((r) => {
+      if (r.ok) {
+        setIsRead(true);
+        dispatchReadEvent(message.messageId, true);
+      }
+    }).catch(() => null);
+  }, [message.messageId, message.isRead, showReadToggle]);
 
   async function toggleRead() {
     const next = !isRead;
@@ -83,6 +105,7 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isRead: next }),
       });
+      dispatchReadEvent(message.messageId, next);
     } catch {
       setIsRead(!next);
     }
@@ -201,22 +224,25 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
               <TooltipContent>Forward</TooltipContent>
             </Tooltip>
 
-            <Separator orientation="vertical" className="h-5 mx-1" />
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8"
-                  onClick={toggleRead}
-                  aria-label={isRead ? 'Mark as Unread' : 'Mark as Read'}
-                >
-                  <MailOpen className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{isRead ? 'Mark as Unread' : 'Mark as Read'}</TooltipContent>
-            </Tooltip>
+            {showReadToggle && (
+              <>
+                <Separator orientation="vertical" className="h-5 mx-1" />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8"
+                      onClick={toggleRead}
+                      aria-label={isRead ? 'Mark as Unread' : 'Mark as Read'}
+                    >
+                      <MailOpen className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{isRead ? 'Mark as Unread' : 'Mark as Read'}</TooltipContent>
+                </Tooltip>
+              </>
+            )}
           </div>
         </TooltipProvider>
       </div>
@@ -244,9 +270,10 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
               <div>
                 {htmlBody ? (
                   <iframe
-                    srcDoc={htmlBody}
+                    srcDoc={processedHtmlBody ?? ''}
                     sandbox="allow-same-origin"
                     className="w-full min-h-96 border-0"
+                    style={isDark ? { filter: 'invert(1) hue-rotate(180deg)' } : undefined}
                     title="Email body"
                     data-testid="html-body-frame"
                   />
