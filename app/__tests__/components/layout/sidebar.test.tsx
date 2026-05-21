@@ -189,6 +189,22 @@ describe('AppSidebar', () => {
     });
   });
 
+  test('replaces unread badge when hermes:inboxcount fires', async () => {
+    mockPathname.mockReturnValue('/inbox/hello%40example.com');
+    renderSidebar();
+    expect(screen.getByText('3')).toBeInTheDocument();
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('hermes:inboxcount', { detail: { address: 'hello@example.com', unreadCount: 7 } }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('7')).toBeInTheDocument();
+    });
+  });
+
   test('Compose button calls openCompose with selected address', async () => {
     mockPathname.mockReturnValue('/inbox/hello%40example.com');
     const user = userEvent.setup();

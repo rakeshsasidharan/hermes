@@ -81,6 +81,14 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
     return () => window.removeEventListener('hermes:readstatus', onReadStatus);
   }, []);
 
+  useEffect(() => {
+    if (direction !== 'inbound') return;
+    const unreadCount = messages.filter((m) => !m.isRead).length;
+    window.dispatchEvent(
+      new CustomEvent('hermes:inboxcount', { detail: { address, unreadCount } }),
+    );
+  }, [messages, address, direction]);
+
   const fetchMessages = useCallback(async (cursor?: string) => {
     setIsLoading(true);
     const params = new URLSearchParams({ address, direction });

@@ -244,6 +244,44 @@ describe('MessageList — hermes:readstatus event', () => {
   });
 });
 
+describe('MessageList — hermes:inboxcount', () => {
+  test('dispatches hermes:inboxcount on mount with unread count', () => {
+    const events: CustomEvent[] = [];
+    const handler = (e: Event) => events.push(e as CustomEvent);
+    window.addEventListener('hermes:inboxcount', handler);
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+    expect(events.length).toBeGreaterThan(0);
+    expect(events[0].detail).toEqual({ address: 'hello@example.com', unreadCount: 1 });
+    window.removeEventListener('hermes:inboxcount', handler);
+  });
+
+  test('does not dispatch hermes:inboxcount for outbound direction', () => {
+    const events: CustomEvent[] = [];
+    const handler = (e: Event) => events.push(e as CustomEvent);
+    window.addEventListener('hermes:inboxcount', handler);
+    render(<MessageList {...DEFAULT_OUTBOUND_PROPS} />);
+    expect(events).toHaveLength(0);
+    window.removeEventListener('hermes:inboxcount', handler);
+  });
+
+  test('updates hermes:inboxcount when hermes:readstatus marks a message read', async () => {
+    const events: CustomEvent[] = [];
+    const handler = (e: Event) => events.push(e as CustomEvent);
+    window.addEventListener('hermes:inboxcount', handler);
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('hermes:readstatus', { detail: { messageId: 'msg-2', isRead: true } }),
+      );
+    });
+    await waitFor(() => {
+      const last = events[events.length - 1];
+      expect(last.detail).toEqual({ address: 'hello@example.com', unreadCount: 0 });
+    });
+    window.removeEventListener('hermes:inboxcount', handler);
+  });
+});
+
 describe('MessageList — shared', () => {
   test('shows empty state when no messages', () => {
     render(<MessageList {...DEFAULT_INBOUND_PROPS} initialMessages={[]} />);

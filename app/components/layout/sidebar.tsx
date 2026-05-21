@@ -91,6 +91,7 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
     return map;
   });
 
+  // Increment from WS events (best-effort; overridden by hermes:inboxcount when inbox is open)
   useEffect(() => {
     return subscribe((event) => {
       setUnreadCounts((prev) => {
@@ -100,6 +101,20 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
       });
     });
   }, [subscribe]);
+
+  // Accurate count broadcast by MessageList on mount and on every local state change
+  useEffect(() => {
+    function onInboxCount(e: Event) {
+      const { address: addr, unreadCount } = (e as CustomEvent<{ address: string; unreadCount: number }>).detail;
+      setUnreadCounts((prev) => {
+        const next = new Map(prev);
+        next.set(addr, unreadCount);
+        return next;
+      });
+    }
+    window.addEventListener('hermes:inboxcount', onInboxCount);
+    return () => window.removeEventListener('hermes:inboxcount', onInboxCount);
+  }, []);
 
   async function handleSignOut() {
     await fetch("/api/auth/signout", { method: "POST" });
