@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 function getTitle(pathname: string): string {
   if (pathname === '/drafts') return 'Drafts';
@@ -25,6 +26,9 @@ export function Topbar() {
     <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4">
       <SidebarTrigger />
       <h1 className="text-sm font-medium text-foreground truncate">{title}</h1>
+      <div className="ml-auto">
+        <ThemeToggle />
+      </div>
     </header>
   );
 }
