@@ -1,15 +1,7 @@
 export interface WsNewMessageEvent {
   type: 'new_message';
   address: string;
-  message: {
-    messageId: string;
-    address: string;
-    sender?: string;
-    subject: string;
-    receivedAt: string;
-    isRead: boolean;
-    attachments?: { filename: string; s3Key: string }[];
-  };
+  messageId: string;
 }
 
 type MessageHandler = (event: WsNewMessageEvent) => void;

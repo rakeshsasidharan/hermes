@@ -180,19 +180,28 @@ describe('AppSidebar', () => {
       wsHandler?.({
         type: 'new_message',
         address: 'info@example.com',
-        message: {
-          messageId: 'msg-new',
-          address: 'info@example.com',
-          sender: 'x@test.com',
-          subject: 'New',
-          receivedAt: new Date().toISOString(),
-          isRead: false,
-        },
+        messageId: 'msg-new',
       });
     });
 
     await waitFor(() => {
       expect(screen.getByText('1')).toBeInTheDocument();
+    });
+  });
+
+  test('replaces unread badge when hermes:inboxcount fires', async () => {
+    mockPathname.mockReturnValue('/inbox/hello%40example.com');
+    renderSidebar();
+    expect(screen.getByText('3')).toBeInTheDocument();
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('hermes:inboxcount', { detail: { address: 'hello@example.com', unreadCount: 7 } }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('7')).toBeInTheDocument();
     });
   });
 

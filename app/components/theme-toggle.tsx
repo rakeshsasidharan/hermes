@@ -1,6 +1,7 @@
 "use client";
 
 import { useTheme } from "next-themes";
+import { useState, useEffect } from "react";
 import { Sun, Moon, Monitor, Check } from "lucide-react";
 import {
   DropdownMenu,
@@ -18,9 +19,11 @@ const themes = [
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const active = themes.find((t) => t.value === theme) ?? themes[2];
-  const ActiveIcon = active.icon;
+  const ActiveIcon = mounted ? active.icon : Monitor;
 
   return (
     <DropdownMenu>
@@ -34,7 +37,7 @@ export function ThemeToggle() {
           <DropdownMenuItem key={value} onClick={() => setTheme(value)}>
             <Icon className="mr-2 size-4" />
             <span>{label}</span>
-            {theme === value && <Check className="ml-auto size-4" />}
+            {mounted && theme === value && <Check className="ml-auto size-4" />}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

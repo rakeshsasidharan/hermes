@@ -127,14 +127,7 @@ describe('WebSocketManager', () => {
       const event: WsNewMessageEvent = {
         type: 'new_message',
         address: 'inbox@example.com',
-        message: {
-          messageId: 'msg-1',
-          address: 'inbox@example.com',
-          sender: 'sender@example.com',
-          subject: 'Hello',
-          receivedAt: new Date().toISOString(),
-          isRead: false,
-        },
+        messageId: 'msg-1',
       };
       MockWebSocket.instances[0].simulateMessage(event);
 

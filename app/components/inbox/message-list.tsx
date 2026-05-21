@@ -54,13 +54,40 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
   useEffect(() => {
     if (direction !== 'inbound') return;
     return subscribe((event) => {
-      if (event.address !== address) return;
-      setMessages((prev) => {
-        if (prev.some((m) => m.messageId === event.message.messageId)) return prev;
-        return [event.message, ...prev];
-      });
+      if (event.address.toLowerCase() !== address.toLowerCase()) return;
+      // The WS payload only carries the messageId; fetch the full record.
+      fetch(`/api/messages/${encodeURIComponent(event.messageId)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          const incoming: Message = data?.message;
+          if (!incoming) return;
+          setMessages((prev) => {
+            if (prev.some((m) => m.messageId === incoming.messageId)) return prev;
+            return [incoming, ...prev];
+          });
+        })
+        .catch(() => null);
     });
   }, [subscribe, address, direction]);
+
+  useEffect(() => {
+    function onReadStatus(e: Event) {
+      const { messageId, isRead } = (e as CustomEvent<{ messageId: string; isRead: boolean }>).detail;
+      setMessages((prev) =>
+        prev.map((m) => m.messageId === messageId ? { ...m, isRead } : m),
+      );
+    }
+    window.addEventListener('hermes:readstatus', onReadStatus);
+    return () => window.removeEventListener('hermes:readstatus', onReadStatus);
+  }, []);
+
+  useEffect(() => {
+    if (direction !== 'inbound') return;
+    const unreadCount = messages.filter((m) => !m.isRead).length;
+    window.dispatchEvent(
+      new CustomEvent('hermes:inboxcount', { detail: { address, unreadCount } }),
+    );
+  }, [messages, address, direction]);
 
   const fetchMessages = useCallback(async (cursor?: string) => {
     setIsLoading(true);

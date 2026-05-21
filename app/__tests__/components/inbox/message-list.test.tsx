@@ -110,42 +110,47 @@ describe('MessageList — inbox (inbound)', () => {
     expect(screen.getByLabelText('Unread')).toBeInTheDocument();
   });
 
-  test('prepends new message from WebSocket event', async () => {
+  test('prepends new message from WebSocket event by fetching the full record', async () => {
+    const wsMessage = {
+      messageId: 'msg-ws',
+      address: 'hello@example.com',
+      from: 'carol@test.com',
+      sender: 'carol@test.com',
+      subject: 'Real-time',
+      receivedAt: new Date().toISOString(),
+      isRead: false,
+    };
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ message: wsMessage }),
+    });
     render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
     act(() => {
-      wsHandler?.({
-        type: 'new_message',
-        address: 'hello@example.com',
-        message: {
-          messageId: 'msg-ws',
-          address: 'hello@example.com',
-          sender: 'carol@test.com',
-          subject: 'Real-time',
-          receivedAt: new Date().toISOString(),
-          isRead: false,
-        },
-      });
+      wsHandler?.({ type: 'new_message', address: 'hello@example.com', messageId: 'msg-ws' });
     });
     await waitFor(() => expect(screen.getByText('carol@test.com')).toBeInTheDocument());
+    expect(global.fetch).toHaveBeenCalledWith('/api/messages/msg-ws');
   });
 
   test('ignores WebSocket events for a different address', async () => {
     render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
     act(() => {
-      wsHandler?.({
-        type: 'new_message',
-        address: 'other@example.com',
-        message: { messageId: 'x', address: 'other@example.com', sender: 'dave@test.com', subject: 'No', receivedAt: new Date().toISOString(), isRead: false },
-      });
+      wsHandler?.({ type: 'new_message', address: 'other@example.com', messageId: 'x' });
     });
+    expect(global.fetch).not.toHaveBeenCalled();
     expect(screen.queryByText('dave@test.com')).not.toBeInTheDocument();
   });
 
   test('does not duplicate a message already present', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ message: INBOUND_MESSAGES[0] }),
+    });
     render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
     act(() => {
-      wsHandler?.({ type: 'new_message', address: 'hello@example.com', message: { ...INBOUND_MESSAGES[0] } });
+      wsHandler?.({ type: 'new_message', address: 'hello@example.com', messageId: 'msg-1' });
     });
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
     expect(screen.getAllByText('alice@test.com')).toHaveLength(1);
   });
 });
@@ -184,6 +189,96 @@ describe('MessageList — sent (outbound)', () => {
   test('does not subscribe to WebSocket events in sent view', () => {
     render(<MessageList {...DEFAULT_OUTBOUND_PROPS} />);
     expect(mockSubscribe).not.toHaveBeenCalled();
+  });
+});
+
+describe('MessageList — hermes:readstatus event', () => {
+  test('clears unread badge when hermes:readstatus fires with isRead=true', async () => {
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+    expect(screen.getByLabelText('Unread')).toBeInTheDocument();
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('hermes:readstatus', { detail: { messageId: 'msg-2', isRead: true } }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText('Unread')).not.toBeInTheDocument();
+    });
+  });
+
+  test('restores unread badge when hermes:readstatus fires with isRead=false', async () => {
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('hermes:readstatus', { detail: { messageId: 'msg-1', isRead: false } }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByLabelText('Unread')).toHaveLength(2);
+    });
+  });
+
+  test('WS message from field is displayed after fetch', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        message: {
+          messageId: 'msg-ws2',
+          address: 'hello@example.com',
+          from: 'ws-sender@test.com',
+          subject: 'WS Subject',
+          receivedAt: new Date().toISOString(),
+          isRead: false,
+        },
+      }),
+    });
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+    act(() => {
+      wsHandler?.({ type: 'new_message', address: 'hello@example.com', messageId: 'msg-ws2' });
+    });
+    await waitFor(() => expect(screen.getByText('ws-sender@test.com')).toBeInTheDocument());
+  });
+});
+
+describe('MessageList — hermes:inboxcount', () => {
+  test('dispatches hermes:inboxcount on mount with unread count', () => {
+    const events: CustomEvent[] = [];
+    const handler = (e: Event) => events.push(e as CustomEvent);
+    window.addEventListener('hermes:inboxcount', handler);
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+    expect(events.length).toBeGreaterThan(0);
+    expect(events[0].detail).toEqual({ address: 'hello@example.com', unreadCount: 1 });
+    window.removeEventListener('hermes:inboxcount', handler);
+  });
+
+  test('does not dispatch hermes:inboxcount for outbound direction', () => {
+    const events: CustomEvent[] = [];
+    const handler = (e: Event) => events.push(e as CustomEvent);
+    window.addEventListener('hermes:inboxcount', handler);
+    render(<MessageList {...DEFAULT_OUTBOUND_PROPS} />);
+    expect(events).toHaveLength(0);
+    window.removeEventListener('hermes:inboxcount', handler);
+  });
+
+  test('updates hermes:inboxcount when hermes:readstatus marks a message read', async () => {
+    const events: CustomEvent[] = [];
+    const handler = (e: Event) => events.push(e as CustomEvent);
+    window.addEventListener('hermes:inboxcount', handler);
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('hermes:readstatus', { detail: { messageId: 'msg-2', isRead: true } }),
+      );
+    });
+    await waitFor(() => {
+      const last = events[events.length - 1];
+      expect(last.detail).toEqual({ address: 'hello@example.com', unreadCount: 0 });
+    });
+    window.removeEventListener('hermes:inboxcount', handler);
   });
 });
 

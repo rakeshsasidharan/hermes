@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SESClient, ListIdentitiesCommand, CreateReceiptRuleCommand } from '@aws-sdk/client-ses';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, ScanCommand, PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, ScanCommand, PutCommand, GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { requireAuth, AuthError } from '@/lib/auth/require-auth';
 
 function getSes() {
@@ -30,7 +30,29 @@ export async function GET(req: NextRequest) {
     ExpressionAttributeValues: { ':deleted': 'deleted' },
   }));
 
-  return NextResponse.json({ addresses: result.Items ?? [] });
+  const addresses = result.Items ?? [];
+
+  // Fetch unread counts for all active addresses in parallel.
+  const withCounts = await Promise.all(
+    addresses.map(async (addr) => {
+      if (addr.status !== 'active') return { ...addr, unreadCount: 0 };
+      try {
+        const unread = await dynamo.send(new QueryCommand({
+          TableName: process.env.MESSAGES_TABLE!,
+          IndexName: 'address-receivedAt-index',
+          KeyConditionExpression: 'address = :addr',
+          FilterExpression: 'isRead = :false AND direction = :dir',
+          ExpressionAttributeValues: { ':addr': addr.email, ':false': false, ':dir': 'inbound' },
+          Select: 'COUNT',
+        }));
+        return { ...addr, unreadCount: unread.Count ?? 0 };
+      } catch {
+        return { ...addr, unreadCount: 0 };
+      }
+    }),
+  );
+
+  return NextResponse.json({ addresses: withCounts });
 }
 
 export async function POST(req: NextRequest) {
