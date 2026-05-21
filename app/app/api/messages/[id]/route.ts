@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { requireAuth, AuthError } from '@/lib/auth/require-auth';
@@ -124,4 +124,37 @@ export async function PATCH(
   }));
 
   return NextResponse.json({ message: result.Attributes });
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    await requireAuth(req);
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+
+  const { id } = await params;
+  const dynamo = getDynamo();
+
+  const existing = await dynamo.send(new GetCommand({
+    TableName: process.env.MESSAGES_TABLE!,
+    Key: { messageId: id },
+  }));
+
+  if (!existing.Item) {
+    return NextResponse.json({ error: 'Message not found' }, { status: 404 });
+  }
+
+  await dynamo.send(new DeleteCommand({
+    TableName: process.env.MESSAGES_TABLE!,
+    Key: { messageId: id },
+  }));
+
+  return NextResponse.json({ success: true });
 }

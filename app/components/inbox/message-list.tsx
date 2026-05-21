@@ -1,20 +1,11 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { useRouter, usePathname } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Paperclip } from 'lucide-react';
-import { FilterBar, type Filters } from './filter-bar';
 import { useWs } from '@/components/ws-context';
 import { cn } from '@/lib/utils';
 
@@ -41,17 +32,24 @@ interface MessageListProps {
   direction: 'inbound' | 'outbound';
   initialMessages: Message[];
   initialNextCursor: string | null;
+  folderLabel: string;
 }
 
-const EMPTY_FILTERS: Filters = { sender: '', subject: '', from: '', to: '' };
+type Filter = 'all' | 'unread';
 
-export function MessageList({ address, direction, initialMessages, initialNextCursor }: MessageListProps) {
+export function MessageList({ address, direction, initialMessages, initialNextCursor, folderLabel }: MessageListProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { subscribe } = useWs();
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [nextCursor, setNextCursor] = useState<string | null>(initialNextCursor);
-  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [filter, setFilter] = useState<Filter>('all');
   const [isLoading, setIsLoading] = useState(false);
+
+  const activeMessageId = (() => {
+    const segments = pathname.split('/');
+    return segments.length >= 4 ? segments[3] : null;
+  })();
 
   useEffect(() => {
     if (direction !== 'inbound') return;
@@ -64,14 +62,9 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
     });
   }, [subscribe, address, direction]);
 
-  const fetchMessages = useCallback(async (cursor?: string, activeFilters?: Filters) => {
+  const fetchMessages = useCallback(async (cursor?: string) => {
     setIsLoading(true);
-    const active = activeFilters ?? filters;
     const params = new URLSearchParams({ address, direction });
-    if (active.sender) params.set('sender', active.sender);
-    if (active.subject) params.set('subject', active.subject);
-    if (active.from) params.set('from', active.from);
-    if (active.to) params.set('to', active.to);
     if (cursor) params.set('cursor', cursor);
 
     try {
@@ -87,16 +80,7 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
     } finally {
       setIsLoading(false);
     }
-  }, [address, direction, filters]);
-
-  const handleFilter = useCallback((newFilters: Filters) => {
-    setFilters(newFilters);
-    fetchMessages(undefined, newFilters);
-  }, [fetchMessages]);
-
-  function handleLoadMore() {
-    if (nextCursor) fetchMessages(nextCursor);
-  }
+  }, [address, direction]);
 
   function handleRowClick(msg: Message) {
     const root = direction === 'outbound' ? 'sent' : 'inbox';
@@ -111,80 +95,116 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
     return name.replace(/^"|"$/g, '');
   }
 
-  return (
-    <div className="space-y-4 ">
-      <FilterBar onFilter={handleFilter} />
-      <div className='border rounded-lg min-h-0 overflow-auto'>
+  function formatDate(iso: string): string {
+    const date = new Date(iso);
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    if (isToday) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  }
 
-      <Table className={isLoading ? 'opacity-50 pointer-events-none' : ''}>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-8"></TableHead>
-            <TableHead>{isSent ? 'To' : 'From'}</TableHead>
-            <TableHead>Subject</TableHead>
-            <TableHead className="text-right">Date</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoading && messages.length === 0 ? (
-            Array.from({ length: 5 }).map((_, i) => (
-              <TableRow key={i}>
-                <TableCell><Skeleton className="h-4 w-4" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
-              </TableRow>
-            ))
-          ) : messages.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                No messages yet.
-              </TableCell>
-            </TableRow>
-          ) : (
-            messages.map((msg) => (
-              <TableRow
-                key={msg.messageId}
-                className={cn(
-                  'cursor-pointer hover:bg-accent',
-                  !isSent && !msg.isRead && 'bg-accent/30 font-medium',
-                )}
-                onClick={() => handleRowClick(msg)}
-              >
-                <TableCell className="py-2">
-                  {msg.attachments && msg.attachments.length > 0 && (
-                    <Paperclip className="h-3.5 w-3.5 text-muted-foreground" aria-label="Has attachments" />
-                  )}
-                </TableCell>
-                <TableCell className="py-2">
-                  <div className="flex items-center gap-2">
-                    {!isSent && !msg.isRead && (
-                      <Badge variant="default" className="h-4 w-4 shrink-0 rounded-full p-0" aria-label="Unread" />
-                    )}
-                    <span className={isSent ? 'truncate max-w-xs' : 'truncate max-w-48'}>
-                      {isSent
-                        ? extractDisplayName(msg.to ?? '')
-                        : extractDisplayName(msg.from ?? msg.sender ?? '')}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="py-2 truncate max-w-xs">{msg.subject}</TableCell>
-                <TableCell className="py-2 text-right text-muted-foreground text-sm whitespace-nowrap">
-                  {new Date(msg.receivedAt).toLocaleDateString()}
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-      </div>
-      {nextCursor && (
-        <div className="flex justify-center">
-          <Button variant="outline" size="sm" onClick={handleLoadMore} disabled={isLoading}>
-            {isLoading ? 'Loading…' : 'Load more'}
+  const displayed = filter === 'unread'
+    ? messages.filter((m) => !m.isRead)
+    : messages;
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between border-b px-4 h-14 shrink-0">
+        <h2 className="font-semibold text-sm">{folderLabel}</h2>
+        <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant={filter === 'all' ? 'secondary' : 'ghost'}
+            className="h-7 text-xs px-3"
+            onClick={() => setFilter('all')}
+            data-testid="filter-all"
+          >
+            All mail
+          </Button>
+          <Button
+            size="sm"
+            variant={filter === 'unread' ? 'secondary' : 'ghost'}
+            className="h-7 text-xs px-3"
+            onClick={() => setFilter('unread')}
+            data-testid="filter-unread"
+          >
+            Unread
           </Button>
         </div>
-      )}
+      </div>
+
+      <div className={cn('flex-1 overflow-y-auto', isLoading && 'opacity-50')}>
+        {isLoading && messages.length === 0 ? (
+          <div className="flex flex-col gap-0">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex flex-col gap-1 px-4 py-3 border-b">
+                <div className="flex justify-between">
+                  <Skeleton className="h-3.5 w-28" />
+                  <Skeleton className="h-3 w-12" />
+                </div>
+                <Skeleton className="h-3 w-48" />
+              </div>
+            ))}
+          </div>
+        ) : displayed.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
+            <p className="text-sm">No messages.</p>
+          </div>
+        ) : (
+          <>
+            {displayed.map((msg) => {
+              const isActive = msg.messageId === activeMessageId;
+              const isUnread = !isSent && !msg.isRead;
+              const displayName = isSent
+                ? extractDisplayName(msg.to ?? '')
+                : extractDisplayName(msg.from ?? msg.sender ?? '');
+
+              return (
+                <button
+                  key={msg.messageId}
+                  type="button"
+                  onClick={() => handleRowClick(msg)}
+                  className={cn(
+                    'w-full text-left flex flex-col gap-0.5 px-4 py-3 border-b cursor-pointer transition-colors',
+                    isActive ? 'bg-accent' : 'hover:bg-accent/50',
+                    isUnread && !isActive && 'bg-accent/20',
+                  )}
+                  data-testid={`message-row-${msg.messageId}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {isUnread && (
+                        <Badge variant="default" className="h-2 w-2 shrink-0 rounded-full p-0" aria-label="Unread" />
+                      )}
+                      <span className={cn('text-sm truncate', isUnread ? 'font-semibold' : 'font-medium')}>
+                        {displayName}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0 text-xs text-muted-foreground">
+                      {msg.attachments && msg.attachments.length > 0 && (
+                        <Paperclip className="h-3 w-3" />
+                      )}
+                      <span>{formatDate(msg.receivedAt)}</span>
+                    </div>
+                  </div>
+                  <span className={cn('text-xs text-muted-foreground truncate', isUnread && 'text-foreground/80')}>
+                    {msg.subject || '(no subject)'}
+                  </span>
+                </button>
+              );
+            })}
+            {nextCursor && (
+              <div className="flex justify-center py-3">
+                <Button variant="ghost" size="sm" onClick={() => fetchMessages(nextCursor)} disabled={isLoading}>
+                  {isLoading ? 'Loading…' : 'Load more'}
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

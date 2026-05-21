@@ -17,6 +17,7 @@ const BASE_MESSAGE = {
 
 const DEFAULT_PROPS = {
   message: BASE_MESSAGE,
+  mode: 'reply' as const,
   currentAddress: 'me@hermes.com',
   onClose: jest.fn(),
 };
@@ -52,13 +53,13 @@ describe('ReplyComposer', () => {
     });
 
     test('shows Cc field for Reply All', () => {
-      render(<ReplyComposer {...DEFAULT_PROPS} replyAll />);
+      render(<ReplyComposer {...DEFAULT_PROPS} mode="replyAll" />);
 
       expect(screen.getByTestId('reply-cc')).toBeInTheDocument();
     });
 
     test('pre-fills Cc for Reply All excluding currentAddress', () => {
-      render(<ReplyComposer {...DEFAULT_PROPS} replyAll />);
+      render(<ReplyComposer {...DEFAULT_PROPS} mode="replyAll" />);
 
       const ccInput = screen.getByTestId('reply-cc');
       expect(ccInput).toHaveValue('other@example.com');

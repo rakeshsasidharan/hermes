@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import { BookMarked, Paperclip, Send, Trash2, X } from 'lucide-react';
 
 interface Message {
@@ -27,7 +26,7 @@ interface UploadedAttachment {
 
 interface ReplyComposerProps {
   message: Message;
-  replyAll?: boolean;
+  mode: 'reply' | 'replyAll' | 'forward';
   isSent?: boolean;
   currentAddress: string;
   quotedBody?: string | null;
@@ -39,8 +38,6 @@ interface ReplyComposerProps {
 type SaveStatus = 'idle' | 'saving' | 'saved';
 
 function buildCcForReplyAll(message: Message, currentAddress: string, isSent: boolean): string {
-  // For inbox: cc everyone from to+cc except ourselves.
-  // For sent: the original to is already the primary To, so only pull from cc.
   const sources = isSent ? [message.cc] : [message.to, message.cc];
   const addresses = sources
     .filter(Boolean)
@@ -53,7 +50,7 @@ function buildCcForReplyAll(message: Message, currentAddress: string, isSent: bo
 
 export function ReplyComposer({
   message,
-  replyAll = false,
+  mode,
   isSent = false,
   currentAddress,
   quotedBody,
@@ -63,16 +60,33 @@ export function ReplyComposer({
 }: ReplyComposerProps) {
   const router = useRouter();
   const originalSubject = message.subject ?? '';
-  const reSubject = originalSubject.toLowerCase().startsWith('re:')
-    ? originalSubject
-    : `Re: ${originalSubject}`;
+
+  const defaultSubject = (() => {
+    if (mode === 'forward') {
+      return originalSubject.toLowerCase().startsWith('fwd:')
+        ? originalSubject
+        : `Fwd: ${originalSubject}`;
+    }
+    return originalSubject.toLowerCase().startsWith('re:')
+      ? originalSubject
+      : `Re: ${originalSubject}`;
+  })();
+
+  const defaultTo = (() => {
+    if (mode === 'forward') return '';
+    return isSent ? (message.to ?? '') : (message.from ?? '');
+  })();
+
+  const defaultCc = mode === 'replyAll'
+    ? buildCcForReplyAll(message, currentAddress, isSent)
+    : '';
 
   const defaultBody = initialBody ?? (quotedBody
-    ? `\n\n--- Original Message ---\n${quotedBody}`
+    ? `\n\n--- ${mode === 'forward' ? 'Forwarded Message' : 'Original Message'} ---\n${quotedBody}`
     : '');
 
-  const [to, setTo] = useState(isSent ? (message.to ?? '') : (message.from ?? ''));
-  const [cc, setCc] = useState(replyAll ? buildCcForReplyAll(message, currentAddress, isSent) : '');
+  const [to, setTo] = useState(defaultTo);
+  const [cc, setCc] = useState(defaultCc);
   const [body, setBody] = useState(defaultBody);
   const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
   const [draftId, setDraftId] = useState<string | null>(initialDraftId);
@@ -83,6 +97,8 @@ export function ReplyComposer({
   const [isUploading, setIsUploading] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const modeLabel = mode === 'forward' ? 'Forward' : mode === 'replyAll' ? 'Reply All' : 'Reply';
 
   async function saveDraft(draftPayload: Record<string, unknown>, existingDraftId: string | null): Promise<string | null> {
     setSaveStatus('saving');
@@ -124,8 +140,9 @@ export function ReplyComposer({
       to,
       cc: cc || undefined,
       body,
+      subject: defaultSubject,
       attachmentKeys: attachments.map((a) => a.s3Key),
-      inReplyToMessageId: message.messageId,
+      ...(mode !== 'forward' && { inReplyToMessageId: message.messageId }),
     };
   }
 
@@ -159,27 +176,43 @@ export function ReplyComposer({
     setIsSending(true);
     setSendError(null);
     try {
-      const res = await fetch(`/api/messages/${message.messageId}/reply`, {
-        method: 'POST',
+      const endpoint = mode === 'forward'
+        ? '/api/messages'
+        : `/api/messages/${message.messageId}/reply`;
+      const method = 'POST';
+      const bodyPayload = mode === 'forward'
+        ? {
+            from: currentAddress,
+            to,
+            cc: cc || undefined,
+            subject: defaultSubject,
+            body,
+            attachmentKeys: attachments.map((a) => a.s3Key),
+            draftId: draftId ?? undefined,
+          }
+        : {
+            from: currentAddress,
+            to,
+            cc: cc || undefined,
+            body,
+            attachmentKeys: attachments.map((a) => a.s3Key),
+            draftId: draftId ?? undefined,
+          };
+
+      const res = await fetch(endpoint, {
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from: currentAddress,
-          to,
-          cc: cc || undefined,
-          body,
-          attachmentKeys: attachments.map((a) => a.s3Key),
-          draftId: draftId ?? undefined,
-        }),
+        body: JSON.stringify(bodyPayload),
       });
       if (!res.ok) {
         const data = await res.json() as { error?: string };
-        setSendError(data.error ?? 'Failed to send reply');
+        setSendError(data.error ?? 'Failed to send');
         return;
       }
       onClose();
       router.refresh();
     } catch {
-      setSendError('Failed to send reply. Please try again.');
+      setSendError('Failed to send. Please try again.');
     } finally {
       setIsSending(false);
     }
@@ -202,16 +235,14 @@ export function ReplyComposer({
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">
-              {replyAll ? 'Reply All' : 'Reply'}
-            </span>
+            <span className="text-sm font-medium">{modeLabel}</span>
             {saveStatus === 'saved' && savedAt && (
               <span className="text-xs text-muted-foreground" data-testid="save-status-saved">
                 Draft saved {formatSavedAt(savedAt)}
               </span>
             )}
           </div>
-          <Button size="icon" variant="ghost" onClick={handleDiscard} aria-label="Discard reply">
+          <Button size="icon" variant="ghost" onClick={handleDiscard} aria-label="Discard">
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -241,7 +272,7 @@ export function ReplyComposer({
           />
         </div>
 
-        {replyAll && (
+        {(mode === 'replyAll' || mode === 'forward') && (
           <div className="space-y-1">
             <Label htmlFor="reply-cc" className="text-xs">Cc</Label>
             <Input
@@ -260,8 +291,8 @@ export function ReplyComposer({
             id="reply-body"
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder="Write your reply…"
-            className="min-h-[160px] resize-y"
+            placeholder={mode === 'forward' ? 'Add a message…' : 'Write your reply…'}
+            className="min-h-40 resize-y"
             data-testid="reply-body"
           />
         </div>
@@ -310,9 +341,6 @@ export function ReplyComposer({
               <Paperclip className="h-3.5 w-3.5" />
               {isUploading ? 'Uploading…' : 'Attach'}
             </Button>
-            {replyAll && (
-              <Badge variant="secondary" className="text-xs">Reply All</Badge>
-            )}
           </div>
 
           <div className="flex items-center gap-2">

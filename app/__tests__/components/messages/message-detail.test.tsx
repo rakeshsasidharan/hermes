@@ -33,8 +33,9 @@ describe('MessageDetail', () => {
   test('renders subject, from, to, and date', () => {
     render(<MessageDetail message={BASE_MSG} />);
     expect(screen.getByText('Hello World')).toBeInTheDocument();
-    expect(screen.getByText(/Alice <alice@test.com>/)).toBeInTheDocument();
-    expect(screen.getByText(/hello@example.com/)).toBeInTheDocument();
+    // from appears in header subtitle and in the metadata section
+    expect(screen.getAllByText(/Alice <alice@test.com>/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/hello@example.com/).length).toBeGreaterThanOrEqual(1);
   });
 
   test('shows no body fallback when no URL provided', () => {
