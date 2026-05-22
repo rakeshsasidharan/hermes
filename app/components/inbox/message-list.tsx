@@ -199,7 +199,7 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
                       'w-full text-left flex flex-col gap-1 px-3 py-3 rounded-lg cursor-pointer transition-colors border border-border',
                       isActive
                         ? 'bg-accent border-accent-foreground/20'
-                        : 'hover:bg-accent/50',
+                        : 'hover:bg-accent/60',
                       isUnread && !isActive && 'bg-accent/20',
                     )}
                     data-testid={`message-row-${msg.messageId}`}
@@ -209,7 +209,7 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
                         {isUnread && (
                           <Badge variant="default" className="h-2 w-2 shrink-0 rounded-full p-0" aria-label="Unread" />
                         )}
-                        <span className={cn('text-sm truncate', isUnread ? 'font-semibold' : 'font-medium')}>
+                        <span className={cn('text-sm truncate text-muted-foreground', isActive ? 'text-muted-background' : '', isUnread ? 'font-semibold' : 'font-medium')}>
                           {displayName}
                         </span>
                       </div>

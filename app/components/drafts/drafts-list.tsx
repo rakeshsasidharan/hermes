@@ -55,10 +55,7 @@ export function DraftsList({ drafts }: DraftsListProps) {
         data-testid="drafts-empty-state"
       >
         <FileText className="h-10 w-10 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">No drafts saved yet.</p>
-        <p className="text-xs text-muted-foreground">
-          Click &quot;Save Draft&quot; in the compose or reply dialog to save a draft here.
-        </p>
+        <p className="text-sm text-muted-foreground">No drafts saved yet</p>
       </div>
     );
   }
