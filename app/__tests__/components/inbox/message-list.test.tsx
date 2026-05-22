@@ -282,6 +282,25 @@ describe('MessageList — hermes:inboxcount', () => {
   });
 });
 
+describe('MessageList — card layout', () => {
+  test('renders message snippet when provided', () => {
+    const msgs = [{ ...INBOUND_MESSAGES[0], snippet: 'This is a preview of the email body' }];
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} initialMessages={msgs} />);
+    expect(screen.getByText('This is a preview of the email body')).toBeInTheDocument();
+  });
+
+  test('does not render snippet element when snippet is absent', () => {
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} initialMessages={[{ ...INBOUND_MESSAGES[0], snippet: undefined }]} />);
+    expect(screen.queryByTestId('message-snippet')).not.toBeInTheDocument();
+  });
+
+  test('each message row has rounded card styling', () => {
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+    const row = screen.getByTestId('message-row-msg-1');
+    expect(row.className).toContain('rounded-lg');
+  });
+});
+
 describe('MessageList — shared', () => {
   test('shows empty state when no messages', () => {
     render(<MessageList {...DEFAULT_INBOUND_PROPS} initialMessages={[]} />);
