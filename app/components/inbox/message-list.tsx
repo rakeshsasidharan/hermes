@@ -196,10 +196,10 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
                     type="button"
                     onClick={() => handleRowClick(msg)}
                     className={cn(
-                      'w-full text-left flex flex-col gap-1 px-3 py-3 rounded-lg cursor-pointer transition-colors border',
+                      'w-full text-left flex flex-col gap-1 px-3 py-3 rounded-lg cursor-pointer transition-colors border border-border',
                       isActive
                         ? 'bg-accent border-accent-foreground/20'
-                        : 'hover:bg-accent/50 border-transparent hover:border-accent-foreground/10',
+                        : 'hover:bg-accent/50',
                       isUnread && !isActive && 'bg-accent/20',
                     )}
                     data-testid={`message-row-${msg.messageId}`}
