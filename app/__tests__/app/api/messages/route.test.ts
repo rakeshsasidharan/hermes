@@ -337,6 +337,18 @@ describe('POST /api/messages', () => {
     expect(item.address).toBe('me@hermes.com');
   });
 
+  test('stores snippet (first 300 chars of body) in DynamoDB record', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+    const longBody = 'A'.repeat(400);
+
+    await POST(makePostReq({ ...validBody, body: longBody }));
+
+    const putArg = (mockDynamoSend.mock.calls[0] as [Record<string, unknown>])[0] as Record<string, unknown>;
+    const item = putArg.Item as Record<string, unknown>;
+    expect(typeof item.snippet).toBe('string');
+    expect((item.snippet as string).length).toBe(300);
+  });
+
   test('includes attachments in MIME message when attachmentKeys provided', async () => {
     mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
 

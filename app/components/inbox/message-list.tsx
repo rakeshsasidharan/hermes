@@ -24,6 +24,7 @@ interface Message {
   subject: string;
   receivedAt: string;
   isRead: boolean;
+  snippet?: string;
   attachments?: Attachment[];
 }
 
@@ -181,47 +182,56 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
           </div>
         ) : (
           <>
-            {displayed.map((msg) => {
-              const isActive = msg.messageId === activeMessageId;
-              const isUnread = !isSent && !msg.isRead;
-              const displayName = isSent
-                ? extractDisplayName(msg.to ?? '')
-                : extractDisplayName(msg.from ?? msg.sender ?? '');
+            <div className="flex flex-col gap-2 p-2">
+              {displayed.map((msg) => {
+                const isActive = msg.messageId === activeMessageId;
+                const isUnread = !isSent && !msg.isRead;
+                const displayName = isSent
+                  ? extractDisplayName(msg.to ?? '')
+                  : extractDisplayName(msg.from ?? msg.sender ?? '');
 
-              return (
-                <button
-                  key={msg.messageId}
-                  type="button"
-                  onClick={() => handleRowClick(msg)}
-                  className={cn(
-                    'w-full text-left flex flex-col gap-0.5 px-4 py-3 border-b cursor-pointer transition-colors',
-                    isActive ? 'bg-accent' : 'hover:bg-accent/50',
-                    isUnread && !isActive && 'bg-accent/20',
-                  )}
-                  data-testid={`message-row-${msg.messageId}`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      {isUnread && (
-                        <Badge variant="default" className="h-2 w-2 shrink-0 rounded-full p-0" aria-label="Unread" />
-                      )}
-                      <span className={cn('text-sm truncate', isUnread ? 'font-semibold' : 'font-medium')}>
-                        {displayName}
+                return (
+                  <button
+                    key={msg.messageId}
+                    type="button"
+                    onClick={() => handleRowClick(msg)}
+                    className={cn(
+                      'w-full text-left flex flex-col gap-1 px-3 py-3 rounded-lg cursor-pointer transition-colors border border-border',
+                      isActive
+                        ? 'bg-accent border-accent-foreground/20'
+                        : 'hover:bg-accent/50',
+                      isUnread && !isActive && 'bg-accent/20',
+                    )}
+                    data-testid={`message-row-${msg.messageId}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {isUnread && (
+                          <Badge variant="default" className="h-2 w-2 shrink-0 rounded-full p-0" aria-label="Unread" />
+                        )}
+                        <span className={cn('text-sm truncate', isUnread ? 'font-semibold' : 'font-medium')}>
+                          {displayName}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0 text-xs text-muted-foreground">
+                        {msg.attachments && msg.attachments.length > 0 && (
+                          <Paperclip className="h-3 w-3" />
+                        )}
+                        <span>{formatDate(msg.receivedAt)}</span>
+                      </div>
+                    </div>
+                    <span className={cn('text-xs truncate', isUnread ? 'font-medium text-foreground/90' : 'text-muted-foreground')}>
+                      {msg.subject || '(no subject)'}
+                    </span>
+                    {msg.snippet && (
+                      <span className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                        {msg.snippet}
                       </span>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0 text-xs text-muted-foreground">
-                      {msg.attachments && msg.attachments.length > 0 && (
-                        <Paperclip className="h-3 w-3" />
-                      )}
-                      <span>{formatDate(msg.receivedAt)}</span>
-                    </div>
-                  </div>
-                  <span className={cn('text-xs text-muted-foreground truncate', isUnread && 'text-foreground/80')}>
-                    {msg.subject || '(no subject)'}
-                  </span>
-                </button>
-              );
-            })}
+                    )}
+                  </button>
+                );
+              })}
+            </div>
             {nextCursor && (
               <div className="flex justify-center py-3">
                 <Button variant="ghost" size="sm" onClick={() => fetchMessages(nextCursor)} disabled={isLoading}>

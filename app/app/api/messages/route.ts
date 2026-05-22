@@ -205,6 +205,7 @@ export async function POST(req: NextRequest) {
       status: 'sent',
       isRead: true,
       bodyTextS3Key: bodyS3Key,
+      snippet: (emailBody as string).replace(/\s+/g, ' ').trim().slice(0, 300) || undefined,
       ...(Array.isArray(attachmentKeys) && attachmentKeys.length > 0
         ? {
             attachments: (attachmentKeys as string[]).map((key) => ({

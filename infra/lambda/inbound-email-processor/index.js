@@ -80,6 +80,7 @@ exports.handler = async (event) => {
       receivedAt,
       bodyTextS3Key: parsed.text ? `parsed/${messageId}/body.txt` : undefined,
       bodyHtmlS3Key: parsed.html ? `parsed/${messageId}/body.html` : undefined,
+      snippet: (parsed.text || '').replace(/\s+/g, ' ').trim().slice(0, 300) || undefined,
       attachments: attachmentKeys,
       isRead: false,
     },
