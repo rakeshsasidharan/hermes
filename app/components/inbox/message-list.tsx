@@ -2,12 +2,10 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Paperclip } from 'lucide-react';
 import { useWs } from '@/components/ws-context';
-import { cn } from '@/lib/utils';
+import { MailboxCard, formatMailboxDate } from '@/components/mailbox-card';
 
 interface Attachment {
   filename: string;
@@ -123,16 +121,6 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
     return name.replace(/^"|"$/g, '');
   }
 
-  function formatDate(iso: string): string {
-    const date = new Date(iso);
-    const now = new Date();
-    const isToday = date.toDateString() === now.toDateString();
-    if (isToday) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-  }
-
   const displayed = filter === 'unread'
     ? messages.filter((m) => !m.isRead)
     : messages;
@@ -163,7 +151,7 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
         </div>
       </div>
 
-      <div className={cn('flex-1 overflow-y-auto', isLoading && 'opacity-50')}>
+      <div className={`flex-1 overflow-y-auto${isLoading ? ' opacity-50' : ''}`}>
         {isLoading && messages.length === 0 ? (
           <div className="flex flex-col gap-0">
             {Array.from({ length: 8 }).map((_, i) => (
@@ -191,44 +179,18 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
                   : extractDisplayName(msg.from ?? msg.sender ?? '');
 
                 return (
-                  <button
+                  <MailboxCard
                     key={msg.messageId}
-                    type="button"
+                    testId={`message-row-${msg.messageId}`}
+                    isActive={isActive}
+                    isUnread={isUnread}
+                    displayName={displayName}
+                    date={formatMailboxDate(msg.receivedAt)}
+                    subject={msg.subject}
+                    snippet={msg.snippet}
+                    hasAttachments={(msg.attachments?.length ?? 0) > 0}
                     onClick={() => handleRowClick(msg)}
-                    className={cn(
-                      'w-full text-left flex flex-col gap-1 px-3 py-3 rounded-lg cursor-pointer transition-colors border border-border',
-                      isActive
-                        ? 'bg-accent border-accent-foreground/20'
-                        : 'hover:bg-accent/60',
-                      isUnread && !isActive && 'bg-accent/20',
-                    )}
-                    data-testid={`message-row-${msg.messageId}`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        {isUnread && (
-                          <Badge variant="default" className="h-2 w-2 shrink-0 rounded-full p-0" aria-label="Unread" />
-                        )}
-                        <span className={cn('text-sm truncate text-muted-foreground', isActive ? 'text-muted-background' : '', isUnread ? 'font-semibold' : 'font-medium')}>
-                          {displayName}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0 text-xs text-muted-foreground">
-                        {msg.attachments && msg.attachments.length > 0 && (
-                          <Paperclip className="h-3 w-3" />
-                        )}
-                        <span>{formatDate(msg.receivedAt)}</span>
-                      </div>
-                    </div>
-                    <span className={cn('text-xs truncate', isUnread ? 'font-medium text-foreground/90' : 'text-muted-foreground')}>
-                      {msg.subject || '(no subject)'}
-                    </span>
-                    {msg.snippet && (
-                      <span className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                        {msg.snippet}
-                      </span>
-                    )}
-                  </button>
+                  />
                 );
               })}
             </div>

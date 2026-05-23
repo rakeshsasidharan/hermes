@@ -3,14 +3,15 @@ import userEvent from '@testing-library/user-event';
 import { DraftsList } from '@/components/drafts/drafts-list';
 
 const mockPush = jest.fn();
-const mockOpenCompose = jest.fn();
+const mockPathname = jest.fn().mockReturnValue('/drafts/me%40hermes.com');
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
+  usePathname: () => mockPathname(),
 }));
 
-jest.mock('@/components/compose-context', () => ({
-  useCompose: () => ({ openCompose: mockOpenCompose, closeCompose: jest.fn(), isOpen: false, initialData: null }),
+jest.mock('@/lib/navigation-guard', () => ({
+  tryNavigate: jest.fn((fn: () => void) => fn()),
 }));
 
 const COMPOSE_DRAFT = {
@@ -41,7 +42,7 @@ const NO_SUBJECT_DRAFT = {
 
 beforeEach(() => {
   mockPush.mockReset();
-  mockOpenCompose.mockReset();
+  mockPathname.mockReturnValue('/drafts/me%40hermes.com');
 });
 
 afterEach(() => {
@@ -55,7 +56,7 @@ describe('DraftsList', () => {
     expect(screen.getByText(/no drafts saved yet/i)).toBeInTheDocument();
   });
 
-  test('renders draft rows when drafts exist', () => {
+  test('renders draft cards when drafts exist', () => {
     render(<DraftsList drafts={[COMPOSE_DRAFT, REPLY_DRAFT]} />);
     expect(screen.getByTestId('drafts-list')).toBeInTheDocument();
     expect(screen.getByTestId(`draft-row-${COMPOSE_DRAFT.draftId}`)).toBeInTheDocument();
@@ -67,42 +68,45 @@ describe('DraftsList', () => {
     expect(screen.getByText('Hello world')).toBeInTheDocument();
   });
 
-  test('shows "No subject" for drafts without subject', () => {
+  test('shows "(no subject)" for drafts without subject', () => {
     render(<DraftsList drafts={[NO_SUBJECT_DRAFT]} />);
-    expect(screen.getByText(/no subject/i)).toBeInTheDocument();
+    expect(screen.getByText('(no subject)')).toBeInTheDocument();
   });
 
-  test('shows recipient address in To column', () => {
+  test('shows recipient address', () => {
     render(<DraftsList drafts={[COMPOSE_DRAFT]} />);
     expect(screen.getByText('recipient@example.com')).toBeInTheDocument();
   });
 
-  test('shows Reply badge for reply drafts', () => {
-    render(<DraftsList drafts={[REPLY_DRAFT]} />);
-    expect(screen.getByText('Reply')).toBeInTheDocument();
+  test('shows "No recipient" when to is missing', () => {
+    const draft = { ...COMPOSE_DRAFT, to: undefined };
+    render(<DraftsList drafts={[draft]} />);
+    expect(screen.getByText('No recipient')).toBeInTheDocument();
   });
 
-  test('shows New badge for new composition drafts', () => {
+  test('applies active styling to the currently open draft', () => {
+    mockPathname.mockReturnValue(`/drafts/me%40hermes.com/${COMPOSE_DRAFT.draftId}`);
     render(<DraftsList drafts={[COMPOSE_DRAFT]} />);
-    expect(screen.getByText('New')).toBeInTheDocument();
+    const card = screen.getByTestId(`draft-row-${COMPOSE_DRAFT.draftId}`);
+    expect(card.className).toContain('border-accent-foreground/20');
   });
 
-  test('clicking new composition draft opens Compose Sheet with restored fields', async () => {
+  test('does not apply active styling to non-active drafts', () => {
+    mockPathname.mockReturnValue(`/drafts/me%40hermes.com/${COMPOSE_DRAFT.draftId}`);
+    render(<DraftsList drafts={[COMPOSE_DRAFT, REPLY_DRAFT]} />);
+    const inactiveCard = screen.getByTestId(`draft-row-${REPLY_DRAFT.draftId}`);
+    expect(inactiveCard.className).not.toContain('border-accent-foreground/20');
+  });
+
+  test('clicking new composition draft navigates to draft editor URL', async () => {
     const user = userEvent.setup();
     render(<DraftsList drafts={[COMPOSE_DRAFT]} />);
 
     await user.click(screen.getByTestId(`draft-row-${COMPOSE_DRAFT.draftId}`));
 
-    expect(mockOpenCompose).toHaveBeenCalledWith(
-      expect.objectContaining({
-        draftId: COMPOSE_DRAFT.draftId,
-        from: COMPOSE_DRAFT.from,
-        to: COMPOSE_DRAFT.to,
-        subject: COMPOSE_DRAFT.subject,
-        body: COMPOSE_DRAFT.body,
-      }),
+    expect(mockPush).toHaveBeenCalledWith(
+      `/drafts/${encodeURIComponent(COMPOSE_DRAFT.from)}/${COMPOSE_DRAFT.draftId}`,
     );
-    expect(mockPush).not.toHaveBeenCalled();
   });
 
   test('clicking reply draft navigates to message with draftId and mode params', async () => {
@@ -120,6 +124,5 @@ describe('DraftsList', () => {
     expect(mockPush).toHaveBeenCalledWith(
       expect.stringContaining('mode=reply'),
     );
-    expect(mockOpenCompose).not.toHaveBeenCalled();
   });
 });

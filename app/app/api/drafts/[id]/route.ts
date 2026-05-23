@@ -7,6 +7,39 @@ function getDynamo() {
   return DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.AWS_REGION ?? 'us-east-1' }));
 }
 
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  let claims;
+  try {
+    claims = await requireAuth(req);
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+
+  const { id: draftId } = await params;
+  const dynamo = getDynamo();
+
+  const result = await dynamo.send(new GetCommand({
+    TableName: process.env.DRAFTS_TABLE!,
+    Key: { draftId },
+  }));
+
+  if (!result.Item) {
+    return NextResponse.json({ error: 'Draft not found' }, { status: 404 });
+  }
+
+  if (result.Item.userId !== claims.sub) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  return NextResponse.json({ draft: result.Item });
+}
+
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },

@@ -23,7 +23,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useWs } from "@/components/ws-context";
-import { useCompose } from "@/components/compose-context";
 import {
   Inbox,
   Send,
@@ -37,6 +36,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isGuardActive, tryNavigate } from "@/lib/navigation-guard";
 
 interface Address {
   email: string;
@@ -71,7 +71,6 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { subscribe } = useWs();
-  const { openCompose } = useCompose();
 
   const activeAddresses = addresses.filter((a) => a.status !== "deleted");
 
@@ -80,6 +79,14 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
     urlAddress && activeAddresses.some((a) => a.email === urlAddress)
       ? urlAddress
       : (activeAddresses[0]?.email ?? null);
+
+  const isOnDraftDetailRoute = /^\/drafts\/[^/]+\/[^/]+$/.test(pathname);
+  const [isComposing, setIsComposing] = useState(false);
+
+  // Reset loading state once navigation lands on any new page
+  useEffect(() => {
+    setIsComposing(false);
+  }, [pathname]);
 
   const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(() => {
     const map = new Map<string, number>();
@@ -116,6 +123,43 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
     return () => window.removeEventListener('hermes:inboxcount', onInboxCount);
   }, []);
 
+  async function handleCompose() {
+    if (!selectedAddress || isComposing || isOnDraftDetailRoute) return;
+    setIsComposing(true);
+    try {
+      const existing = await findExistingNewDraft(selectedAddress);
+      if (existing) {
+        router.push(`/drafts/${encodeURIComponent(selectedAddress)}/${existing}`);
+        return;
+      }
+      const res = await fetch('/api/drafts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: selectedAddress }),
+      });
+      if (!res.ok) { setIsComposing(false); return; }
+      const data = await res.json() as { draftId: string };
+      router.push(`/drafts/${encodeURIComponent(selectedAddress)}/${data.draftId}`);
+    } catch {
+      setIsComposing(false);
+    }
+  }
+
+  async function findExistingNewDraft(address: string): Promise<string | null> {
+    try {
+      const res = await fetch(`/api/drafts?from=${encodeURIComponent(address)}`);
+      if (!res.ok) return null;
+      const data = await res.json() as {
+        drafts?: Array<{ draftId: string; inReplyToMessageId?: string; to?: string; subject?: string; body?: string }>;
+      };
+      return data.drafts?.find(
+        (d) => !d.inReplyToMessageId && !d.to && !d.subject && !d.body,
+      )?.draftId ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   async function handleSignOut() {
     await fetch("/api/auth/signout", { method: "POST" });
     router.push("/login");
@@ -124,7 +168,7 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
   function handleAddressSwitch(email: string) {
     const folder = FOLDERS.find((f) => pathname.startsWith(`/${f.key}/`));
     const target = folder ? folder.href(email) : `/inbox/${encodeURIComponent(email)}`;
-    router.push(target);
+    tryNavigate(() => router.push(target));
   }
 
   const activeFolder = FOLDERS.find((f) => pathname.startsWith(`/${f.key}/`))?.key ?? null;
@@ -186,11 +230,16 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   tooltip="Compose"
-                  onClick={() => openCompose(selectedAddress ? { from: selectedAddress } : undefined)}
+                  onClick={handleCompose}
                   data-testid="compose-button"
                   variant="btnDefault"
+                  disabled={isComposing || isOnDraftDetailRoute}
+                  aria-busy={isComposing}
                 >
-                  <PenSquare />
+                  {isComposing
+                    ? <Loader2 className="animate-spin" />
+                    : <PenSquare />
+                  }
                   <span>Compose</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -214,7 +263,15 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
                           isActive={isActive}
                           tooltip={folder.label}
                         >
-                          <Link href={href} data-testid={`folder-link-${folder.key}`}>
+                          <Link
+                            href={href}
+                            data-testid={`folder-link-${folder.key}`}
+                            onClick={(e) => {
+                              if (!isGuardActive()) return;
+                              e.preventDefault();
+                              tryNavigate(() => router.push(href));
+                            }}
+                          >
                             <FolderLinkInner icon={folder.icon} label={folder.label} />
                             <span>{folder.label}</span>
                             {showCount && (

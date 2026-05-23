@@ -6,7 +6,6 @@ import type { WsNewMessageEvent } from '@/lib/ws';
 
 const mockPush = jest.fn();
 const mockPathname = jest.fn().mockReturnValue('/');
-const mockOpenCompose = jest.fn();
 
 jest.mock('next/navigation', () => ({
   usePathname: () => mockPathname(),
@@ -32,13 +31,9 @@ jest.mock('@/components/ws-context', () => ({
   useWs: () => ({ subscribe: mockSubscribe }),
 }));
 
-jest.mock('@/components/compose-context', () => ({
-  useCompose: () => ({
-    openCompose: mockOpenCompose,
-    closeCompose: jest.fn(),
-    isOpen: false,
-    initialData: null,
-  }),
+jest.mock('@/lib/navigation-guard', () => ({
+  isGuardActive: jest.fn(() => false),
+  tryNavigate: jest.fn((fn: () => void) => fn()),
 }));
 
 jest.mock('@/components/ui/tooltip', () => ({
@@ -85,7 +80,6 @@ beforeEach(() => {
   mockPush.mockReset();
   wsHandler = null;
   mockSubscribe.mockClear();
-  mockOpenCompose.mockReset();
 });
 
 afterEach(() => {
@@ -205,14 +199,96 @@ describe('AppSidebar', () => {
     });
   });
 
-  test('Compose button calls openCompose with selected address', async () => {
+  test('Compose button shows spinner and is disabled while creating draft', async () => {
     mockPathname.mockReturnValue('/inbox/hello%40example.com');
+    let resolveFetch!: (v: unknown) => void;
+    (global.fetch as jest.Mock).mockImplementationOnce(
+      () => new Promise((res) => { resolveFetch = res; }),
+    );
     const user = userEvent.setup();
     renderSidebar();
 
     await user.click(screen.getByTestId('compose-button'));
 
-    expect(mockOpenCompose).toHaveBeenCalledWith({ from: 'hello@example.com' });
+    expect(screen.getByTestId('compose-button')).toBeDisabled();
+
+    resolveFetch({ ok: true, json: async () => ({ drafts: [] }) });
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ draftId: 'new-draft-id' }),
+    });
+  });
+
+  test('Compose button navigates to existing new draft when one already exists', async () => {
+    mockPathname.mockReturnValue('/inbox/hello%40example.com');
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ drafts: [{ draftId: 'existing-draft', inReplyToMessageId: undefined }] }),
+    });
+    const user = userEvent.setup();
+    renderSidebar();
+
+    await user.click(screen.getByTestId('compose-button'));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith(
+        `/drafts/${encodeURIComponent('hello@example.com')}/existing-draft`,
+      );
+    });
+    expect(global.fetch).not.toHaveBeenCalledWith('/api/drafts', expect.objectContaining({ method: 'POST' }));
+  });
+
+  test('Compose button creates new draft when existing drafts all have saved content', async () => {
+    mockPathname.mockReturnValue('/inbox/hello%40example.com');
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          drafts: [{ draftId: 'saved-draft', subject: 'Hello world' }],
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ draftId: 'new-draft-id' }) });
+    const user = userEvent.setup();
+    renderSidebar();
+
+    await user.click(screen.getByTestId('compose-button'));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/drafts',
+        expect.objectContaining({ method: 'POST' }),
+      );
+      expect(mockPush).toHaveBeenCalledWith(
+        `/drafts/${encodeURIComponent('hello@example.com')}/new-draft-id`,
+      );
+    });
+  });
+
+  test('Compose button creates new draft when no existing new draft found', async () => {
+    mockPathname.mockReturnValue('/inbox/hello%40example.com');
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ drafts: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ draftId: 'new-draft-id' }) });
+    const user = userEvent.setup();
+    renderSidebar();
+
+    await user.click(screen.getByTestId('compose-button'));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/drafts',
+        expect.objectContaining({ method: 'POST' }),
+      );
+      expect(mockPush).toHaveBeenCalledWith(
+        `/drafts/${encodeURIComponent('hello@example.com')}/new-draft-id`,
+      );
+    });
+  });
+
+  test('Compose button is disabled when on a draft detail route', () => {
+    mockPathname.mockReturnValue('/drafts/hello%40example.com/some-draft-id');
+    renderSidebar();
+    expect(screen.getByTestId('compose-button')).toBeDisabled();
   });
 
   test('calls sign out on button click', async () => {
