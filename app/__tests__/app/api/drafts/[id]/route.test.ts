@@ -28,7 +28,7 @@ import { requireAuth, AuthError } from '@/lib/auth/require-auth';
 
 process.env.DRAFTS_TABLE = 'hermes-drafts';
 
-import { PUT, DELETE } from '@/app/api/drafts/[id]/route';
+import { GET, PUT, DELETE } from '@/app/api/drafts/[id]/route';
 
 const mockRequireAuth = requireAuth as jest.Mock;
 
@@ -57,6 +57,57 @@ const DRAFT_ITEM = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+});
+
+function makeGetReq() {
+  return new NextRequest('http://localhost/api/drafts/draft-1', { method: 'GET' });
+}
+
+// ── GET /api/drafts/:id ──────────────────────────────────────────────────────
+
+describe('GET /api/drafts/:id', () => {
+  test('returns 200 with draft when found and owned by user', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+    mockDynamoSend.mockResolvedValue({ Item: DRAFT_ITEM });
+
+    const res = await GET(makeGetReq(), { params: makeParams() });
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.draft.draftId).toBe('draft-1');
+  });
+
+  test('returns 404 when draft not found', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+    mockDynamoSend.mockResolvedValue({ Item: undefined });
+
+    const res = await GET(makeGetReq(), { params: makeParams() });
+    const json = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(json.error).toContain('not found');
+  });
+
+  test('returns 403 when draft belongs to another user', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'different-user' });
+    mockDynamoSend.mockResolvedValue({ Item: DRAFT_ITEM });
+
+    const res = await GET(makeGetReq(), { params: makeParams() });
+    const json = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(json.error).toBe('Forbidden');
+  });
+
+  test('returns 401 for unauthenticated request', async () => {
+    mockRequireAuth.mockRejectedValue(new AuthError('Missing authentication token', 401));
+
+    const res = await GET(makeGetReq(), { params: makeParams() });
+    const json = await res.json();
+
+    expect(res.status).toBe(401);
+    expect(json.error).toBe('Missing authentication token');
+  });
 });
 
 // ── PUT /api/drafts/:id ──────────────────────────────────────────────────────

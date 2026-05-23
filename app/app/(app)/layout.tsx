@@ -4,8 +4,6 @@ import { AppSidebar } from '@/components/layout/sidebar';
 import { ConditionalLayout } from '@/components/layout/conditional-layout';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { WebSocketProvider } from '@/components/ws-context';
-import { ComposeProvider } from '@/components/compose-context';
-import { ComposeSheet } from '@/components/messages/compose-sheet';
 
 interface Address {
   email: string;
@@ -44,15 +42,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <WebSocketProvider token={token} wsEndpoint={wsEndpoint}>
-      <ComposeProvider>
-        <SidebarProvider className="h-svh">
-          <AppSidebar addresses={addresses} />
-          <SidebarInset className="flex flex-col min-h-0">
-            <ConditionalLayout>{children}</ConditionalLayout>
-          </SidebarInset>
-        </SidebarProvider>
-        <ComposeSheet addresses={addresses} />
-      </ComposeProvider>
+      <SidebarProvider className="h-svh">
+        <AppSidebar addresses={addresses} />
+        <SidebarInset className="flex flex-col min-h-0">
+          <ConditionalLayout>{children}</ConditionalLayout>
+        </SidebarInset>
+      </SidebarProvider>
     </WebSocketProvider>
   );
 }
