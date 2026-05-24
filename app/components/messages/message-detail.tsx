@@ -15,6 +15,7 @@ import {
   MailOpen,
   Download,
   Inbox,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ReplyComposer } from '@/components/messages/reply-composer';
@@ -64,6 +65,9 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
   const [isRead, setIsRead] = useState(message.isRead);
   const [composerMode, setComposerMode] = useState<ComposerMode>(initialComposerMode ?? null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [isMovingToJunk, setIsMovingToJunk] = useState(false);
+  const [isTogglingRead, setIsTogglingRead] = useState(false);
 
   function dispatchReadEvent(messageId: string, isRead: boolean) {
     window.dispatchEvent(new CustomEvent('hermes:readstatus', { detail: { messageId, isRead } }));
@@ -86,6 +90,7 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
   async function toggleRead() {
     const next = !isRead;
     setIsRead(next);
+    setIsTogglingRead(true);
     try {
       await fetch(`/api/messages/${message.messageId}`, {
         method: 'PATCH',
@@ -95,6 +100,8 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
       dispatchReadEvent(message.messageId, next);
     } catch {
       setIsRead(!next);
+    } finally {
+      setIsTogglingRead(false);
     }
   }
 
@@ -144,6 +151,7 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
   }
 
   async function handleRestoreToInbox() {
+    setIsRestoring(true);
     try {
       const res = await fetch(`/api/messages/${message.messageId}`, {
         method: 'PATCH',
@@ -160,10 +168,13 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
       router.refresh();
     } catch {
       toast.error('Failed to restore message');
+    } finally {
+      setIsRestoring(false);
     }
   }
 
   async function handleMoveToJunk() {
+    setIsMovingToJunk(true);
     try {
       const res = await fetch(`/api/messages/${message.messageId}`, {
         method: 'PATCH',
@@ -180,6 +191,8 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
       router.refresh();
     } catch {
       toast.error('Failed to move message to Junk');
+    } finally {
+      setIsMovingToJunk(false);
     }
   }
 
@@ -205,9 +218,10 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
                     variant="ghost"
                     className="h-8 w-8"
                     onClick={handleRestoreToInbox}
+                    disabled={isRestoring}
                     aria-label="Restore to Inbox"
                   >
-                    <Inbox className="h-4 w-4" />
+                    {isRestoring ? <Loader2 className="h-4 w-4 animate-spin" /> : <Inbox className="h-4 w-4" />}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Restore to Inbox</TooltipContent>
@@ -220,9 +234,10 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
                     variant="ghost"
                     className="h-8 w-8"
                     onClick={handleMoveToJunk}
+                    disabled={isMovingToJunk}
                     aria-label="Move to Junk"
                   >
-                    <AlertTriangle className="h-4 w-4" />
+                    {isMovingToJunk ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertTriangle className="h-4 w-4" />}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Move to Junk</TooltipContent>
@@ -302,9 +317,10 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
                       variant="ghost"
                       className="h-8 w-8"
                       onClick={toggleRead}
+                      disabled={isTogglingRead}
                       aria-label={isRead ? 'Mark as Unread' : 'Mark as Read'}
                     >
-                      <MailOpen className="h-4 w-4" />
+                      {isTogglingRead ? <Loader2 className="h-4 w-4 animate-spin" /> : <MailOpen className="h-4 w-4" />}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>{isRead ? 'Mark as Unread' : 'Mark as Read'}</TooltipContent>

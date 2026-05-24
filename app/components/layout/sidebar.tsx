@@ -82,10 +82,13 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
 
   const isOnDraftDetailRoute = /^\/drafts\/[^/]+\/[^/]+$/.test(pathname);
   const [isComposing, setIsComposing] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [switchingToAddress, setSwitchingToAddress] = useState<string | null>(null);
 
-  // Reset loading state once navigation lands on any new page
+  // Reset loading states once navigation lands on any new page
   useEffect(() => {
     setIsComposing(false);
+    setSwitchingToAddress(null);
   }, [pathname]);
 
   const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(() => {
@@ -161,13 +164,19 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
   }
 
   async function handleSignOut() {
-    await fetch("/api/auth/signout", { method: "POST" });
-    router.push("/login");
+    setIsSigningOut(true);
+    try {
+      await fetch("/api/auth/signout", { method: "POST" });
+      router.push("/login");
+    } catch {
+      setIsSigningOut(false);
+    }
   }
 
   function handleAddressSwitch(email: string) {
     const folder = FOLDERS.find((f) => pathname.startsWith(`/${f.key}/`));
     const target = folder ? folder.href(email) : `/inbox/${encodeURIComponent(email)}`;
+    setSwitchingToAddress(email);
     tryNavigate(() => router.push(target));
   }
 
@@ -211,8 +220,13 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
                     <DropdownMenuItem
                       key={addr.email}
                       onSelect={() => handleAddressSwitch(addr.email)}
+                      disabled={switchingToAddress !== null}
                       className={cn(addr.email === selectedAddress && "font-medium")}
                     >
+                      {switchingToAddress === addr.email
+                        ? <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                        : <Mail className="h-4 w-4 shrink-0 opacity-0" />
+                      }
                       {addr.email}
                     </DropdownMenuItem>
                   ))}
@@ -297,8 +311,8 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Sign out" onClick={handleSignOut}>
-              <LogOut />
+            <SidebarMenuButton tooltip="Sign out" onClick={handleSignOut} disabled={isSigningOut} aria-busy={isSigningOut}>
+              {isSigningOut ? <Loader2 className="animate-spin" /> : <LogOut />}
               <span>Sign out</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
