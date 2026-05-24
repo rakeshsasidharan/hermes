@@ -325,6 +325,18 @@ describe('MessageList — folder prop (junk)', () => {
     expect(mockSubscribe).not.toHaveBeenCalled();
   });
 
+  test('optimistically clears unread badge when clicking an unread junk message', async () => {
+    const { useRouter } = require('next/navigation');
+    useRouter.mockReturnValue({ push: jest.fn() });
+    const user = userEvent.setup();
+    render(<MessageList {...JUNK_PROPS} />);
+    expect(screen.getByLabelText('Unread')).toBeInTheDocument();
+    await user.click(screen.getByTestId('message-row-msg-2'));
+    await waitFor(() => {
+      expect(screen.queryByLabelText('Unread')).not.toBeInTheDocument();
+    });
+  });
+
   test('does not dispatch hermes:inboxcount for junk folder', () => {
     const events: CustomEvent[] = [];
     const handler = (e: Event) => events.push(e as CustomEvent);
@@ -459,5 +471,27 @@ describe('MessageList — shared', () => {
     render(<MessageList {...DEFAULT_OUTBOUND_PROPS} />);
     await user.click(screen.getByTestId('message-row-msg-out'));
     expect(mockPush).toHaveBeenCalledWith('/sent/hello%40example.com/msg-out');
+  });
+
+  test('optimistically clears unread badge when clicking an unread inbox message', async () => {
+    const { useRouter } = require('next/navigation');
+    useRouter.mockReturnValue({ push: jest.fn() });
+    const user = userEvent.setup();
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+    expect(screen.getByLabelText('Unread')).toBeInTheDocument();
+    await user.click(screen.getByTestId('message-row-msg-2'));
+    await waitFor(() => {
+      expect(screen.queryByLabelText('Unread')).not.toBeInTheDocument();
+    });
+  });
+
+  test('does not optimistically clear unread badge for outbound messages', async () => {
+    const { useRouter } = require('next/navigation');
+    useRouter.mockReturnValue({ push: jest.fn() });
+    const unreadOutbound = [{ ...OUTBOUND_MESSAGES[0], isRead: false }];
+    const user = userEvent.setup();
+    render(<MessageList {...DEFAULT_OUTBOUND_PROPS} initialMessages={unreadOutbound} />);
+    await user.click(screen.getByTestId('message-row-msg-out'));
+    expect(screen.queryByLabelText('Unread')).not.toBeInTheDocument();
   });
 });
