@@ -240,6 +240,41 @@ describe('GET /api/messages', () => {
     expect(queryArg.FilterExpression).toBeUndefined();
   });
 
+  test('folder=junk filters by folder attribute only', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+    mockDynamoSend.mockResolvedValue({ Items: [], LastEvaluatedKey: undefined });
+
+    await GET(makeGetReq({ address: 'inbox@example.com', folder: 'junk' }));
+
+    const queryArg = (mockDynamoSend.mock.calls[0] as [Record<string, unknown>])[0];
+    expect(queryArg.FilterExpression).toContain('#folder = :folder');
+    expect(queryArg.ExpressionAttributeValues).toMatchObject({ ':folder': 'junk' });
+    expect(queryArg.FilterExpression).not.toContain('#direction');
+  });
+
+  test('folder=inbox filters by direction=inbound and folder=inbox or missing', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+    mockDynamoSend.mockResolvedValue({ Items: [], LastEvaluatedKey: undefined });
+
+    await GET(makeGetReq({ address: 'inbox@example.com', folder: 'inbox' }));
+
+    const queryArg = (mockDynamoSend.mock.calls[0] as [Record<string, unknown>])[0];
+    expect(queryArg.FilterExpression).toContain('#direction = :inbound');
+    expect(queryArg.FilterExpression).toContain('attribute_not_exists(#folder)');
+    expect(queryArg.ExpressionAttributeValues).toMatchObject({ ':inbound': 'inbound', ':folder': 'inbox' });
+  });
+
+  test('folder param takes precedence over direction param', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+    mockDynamoSend.mockResolvedValue({ Items: [], LastEvaluatedKey: undefined });
+
+    await GET(makeGetReq({ address: 'inbox@example.com', folder: 'junk', direction: 'inbound' }));
+
+    const queryArg = (mockDynamoSend.mock.calls[0] as [Record<string, unknown>])[0];
+    expect(queryArg.FilterExpression).toContain('#folder = :folder');
+    expect(queryArg.FilterExpression).not.toContain('#direction = :direction');
+  });
+
   test('defaults limit to 20', async () => {
     mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
     mockDynamoSend.mockResolvedValue({ Items: [], LastEvaluatedKey: undefined });

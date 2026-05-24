@@ -282,6 +282,72 @@ describe('MessageList — hermes:inboxcount', () => {
   });
 });
 
+describe('MessageList — folder prop (junk)', () => {
+  const JUNK_PROPS = {
+    address: 'hello@example.com',
+    direction: 'inbound' as const,
+    folder: 'junk' as const,
+    initialMessages: INBOUND_MESSAGES,
+    initialNextCursor: null,
+    folderLabel: 'Junk',
+  };
+
+  test('renders Junk folder label', () => {
+    render(<MessageList {...JUNK_PROPS} />);
+    expect(screen.getByText('Junk')).toBeInTheDocument();
+  });
+
+  test('navigates to /junk/[address]/[messageId] on row click', async () => {
+    const { useRouter } = require('next/navigation');
+    const mockPush = jest.fn();
+    useRouter.mockReturnValue({ push: mockPush });
+    const user = userEvent.setup();
+    render(<MessageList {...JUNK_PROPS} />);
+    await user.click(screen.getByTestId('message-row-msg-1'));
+    expect(mockPush).toHaveBeenCalledWith('/junk/hello%40example.com/msg-1');
+  });
+
+  test('passes folder=junk to API on pagination', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ messages: [], nextCursor: null }),
+    });
+    const user = userEvent.setup();
+    render(<MessageList {...JUNK_PROPS} initialNextCursor="cursor1" />);
+    await user.click(screen.getByRole('button', { name: /load more/i }));
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('folder=junk'));
+    });
+  });
+
+  test('does not subscribe to WebSocket events for junk folder', () => {
+    render(<MessageList {...JUNK_PROPS} />);
+    expect(mockSubscribe).not.toHaveBeenCalled();
+  });
+
+  test('does not dispatch hermes:inboxcount for junk folder', () => {
+    const events: CustomEvent[] = [];
+    const handler = (e: Event) => events.push(e as CustomEvent);
+    window.addEventListener('hermes:inboxcount', handler);
+    render(<MessageList {...JUNK_PROPS} />);
+    expect(events).toHaveLength(0);
+    window.removeEventListener('hermes:inboxcount', handler);
+  });
+
+  test('removes message from list when hermes:messageremoved fires', async () => {
+    render(<MessageList {...JUNK_PROPS} />);
+    expect(screen.getByText('alice@test.com')).toBeInTheDocument();
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('hermes:messageremoved', { detail: { messageId: 'msg-1' } }),
+      );
+    });
+    await waitFor(() => {
+      expect(screen.queryByText('alice@test.com')).not.toBeInTheDocument();
+    });
+  });
+});
+
 describe('MessageList — card layout', () => {
   test('renders message snippet when provided', () => {
     const msgs = [{ ...INBOUND_MESSAGES[0], snippet: 'This is a preview of the email body' }];

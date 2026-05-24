@@ -14,6 +14,7 @@ import {
   Forward,
   MailOpen,
   Download,
+  Inbox,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ReplyComposer } from '@/components/messages/reply-composer';
@@ -105,12 +106,37 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
         toast.error('Failed to delete message');
         return;
       }
+      dispatchMessageRemoved(message.messageId);
       router.push(listHref);
       router.refresh();
     } catch {
       toast.error('Failed to delete message');
     } finally {
       setIsDeleting(false);
+    }
+  }
+
+  function dispatchMessageRemoved(messageId: string) {
+    window.dispatchEvent(new CustomEvent('hermes:messageremoved', { detail: { messageId } }));
+  }
+
+  async function handleRestoreToInbox() {
+    try {
+      const res = await fetch(`/api/messages/${message.messageId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder: 'inbox' }),
+      });
+      if (!res.ok) {
+        toast.error('Failed to restore message');
+        return;
+      }
+      dispatchMessageRemoved(message.messageId);
+      toast.success('Moved to Inbox');
+      router.push(listHref);
+      router.refresh();
+    } catch {
+      toast.error('Failed to restore message');
     }
   }
 
@@ -132,20 +158,37 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
 
         <TooltipProvider delayDuration={300}>
           <div className="flex items-center gap-1 shrink-0">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8"
-                  onClick={handleMoveToJunk}
-                  aria-label="Move to Junk"
-                >
-                  <AlertTriangle className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Move to Junk</TooltipContent>
-            </Tooltip>
+            {folder === 'junk' ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={handleRestoreToInbox}
+                    aria-label="Restore to Inbox"
+                  >
+                    <Inbox className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Restore to Inbox</TooltipContent>
+              </Tooltip>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={handleMoveToJunk}
+                    aria-label="Move to Junk"
+                  >
+                    <AlertTriangle className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Move to Junk</TooltipContent>
+              </Tooltip>
+            )}
 
             <Tooltip>
               <TooltipTrigger asChild>

@@ -82,6 +82,7 @@ exports.handler = async (event) => {
       bodyHtmlS3Key: parsed.html ? `parsed/${messageId}/body.html` : undefined,
       snippet: (parsed.text || '').replace(/\s+/g, ' ').trim().slice(0, 300) || undefined,
       attachments: attachmentKeys,
+      folder: 'inbox',
       isRead: false,
     },
   }));

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
+
+const VALID_FOLDERS = ['inbox', 'junk', 'trash'] as const;
+type Folder = typeof VALID_FOLDERS[number];
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { requireAuth, AuthError } from '@/lib/auth/require-auth';
@@ -88,15 +91,26 @@ export async function PATCH(
   const { id } = await params;
 
   let isRead: unknown;
+  let folder: unknown;
   try {
     const body = await req.json();
     isRead = body?.isRead;
+    folder = body?.folder;
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  if (typeof isRead !== 'boolean') {
+  const hasIsRead = isRead !== undefined;
+  const hasFolder = folder !== undefined;
+
+  if (!hasIsRead && !hasFolder) {
+    return NextResponse.json({ error: 'At least one of isRead or folder must be provided' }, { status: 400 });
+  }
+  if (hasIsRead && typeof isRead !== 'boolean') {
     return NextResponse.json({ error: 'isRead must be a boolean' }, { status: 400 });
+  }
+  if (hasFolder && !VALID_FOLDERS.includes(folder as Folder)) {
+    return NextResponse.json({ error: `folder must be one of: ${VALID_FOLDERS.join(', ')}` }, { status: 400 });
   }
 
   const dynamo = getDynamo();
@@ -110,16 +124,29 @@ export async function PATCH(
     return NextResponse.json({ error: 'Message not found' }, { status: 404 });
   }
 
+  const setClauses: string[] = ['updatedAt = :now'];
+  const expressionAttributeNames: Record<string, string> = {};
+  const expressionAttributeValues: Record<string, unknown> = { ':now': new Date().toISOString() };
+
+  if (hasIsRead) {
+    setClauses.push('isRead = :isRead', '#status = :status');
+    expressionAttributeNames['#status'] = 'status';
+    expressionAttributeValues[':isRead'] = isRead;
+    expressionAttributeValues[':status'] = isRead ? 'read' : 'unread';
+  }
+
+  if (hasFolder) {
+    setClauses.push('#folder = :folder');
+    expressionAttributeNames['#folder'] = 'folder';
+    expressionAttributeValues[':folder'] = folder;
+  }
+
   const result = await dynamo.send(new UpdateCommand({
     TableName: process.env.MESSAGES_TABLE!,
     Key: { messageId: id },
-    UpdateExpression: 'SET isRead = :isRead, #status = :status, updatedAt = :now',
-    ExpressionAttributeNames: { '#status': 'status' },
-    ExpressionAttributeValues: {
-      ':isRead': isRead,
-      ':status': isRead ? 'read' : 'unread',
-      ':now': new Date().toISOString(),
-    },
+    UpdateExpression: `SET ${setClauses.join(', ')}`,
+    ...(Object.keys(expressionAttributeNames).length > 0 && { ExpressionAttributeNames: expressionAttributeNames }),
+    ExpressionAttributeValues: expressionAttributeValues,
     ReturnValues: 'ALL_NEW',
   }));
 

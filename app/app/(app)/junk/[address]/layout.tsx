@@ -22,7 +22,7 @@ async function getMessages(address: string) {
   if (!token) redirect('/login');
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
-  const params = new URLSearchParams({ address, folder: 'inbox' });
+  const params = new URLSearchParams({ address, folder: 'junk' });
   const res = await fetch(`${baseUrl}/api/messages?${params.toString()}`, {
     headers: { Cookie: `access_token=${token}` },
     cache: 'no-store',
@@ -39,7 +39,7 @@ interface Props {
   children: React.ReactNode;
 }
 
-export default async function InboxAddressLayout({ params, children }: Props) {
+export default async function JunkAddressLayout({ params, children }: Props) {
   const { address } = await params;
   const decodedAddress = decodeURIComponent(address);
   const { messages, nextCursor } = await getMessages(decodedAddress);
@@ -50,10 +50,10 @@ export default async function InboxAddressLayout({ params, children }: Props) {
         <MessageList
           address={decodedAddress}
           direction="inbound"
-          folder="inbox"
+          folder="junk"
           initialMessages={messages}
           initialNextCursor={nextCursor}
-          folderLabel="Inbox"
+          folderLabel="Junk"
         />
       }
       detail={children}
