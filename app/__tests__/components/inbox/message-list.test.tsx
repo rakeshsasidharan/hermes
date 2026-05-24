@@ -348,6 +348,50 @@ describe('MessageList — folder prop (junk)', () => {
   });
 });
 
+describe('MessageList — folder prop (trash)', () => {
+  const TRASH_PROPS = {
+    address: 'hello@example.com',
+    direction: 'inbound' as const,
+    folder: 'trash' as const,
+    initialMessages: INBOUND_MESSAGES,
+    initialNextCursor: null,
+    folderLabel: 'Trash',
+  };
+
+  test('renders Trash folder label', () => {
+    render(<MessageList {...TRASH_PROPS} />);
+    expect(screen.getByText('Trash')).toBeInTheDocument();
+  });
+
+  test('navigates to /trash/[address]/[messageId] on row click', async () => {
+    const { useRouter } = require('next/navigation');
+    const mockPush = jest.fn();
+    useRouter.mockReturnValue({ push: mockPush });
+    const user = userEvent.setup();
+    render(<MessageList {...TRASH_PROPS} />);
+    await user.click(screen.getByTestId('message-row-msg-1'));
+    expect(mockPush).toHaveBeenCalledWith('/trash/hello%40example.com/msg-1');
+  });
+
+  test('passes folder=trash to API on pagination', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ messages: [], nextCursor: null }),
+    });
+    const user = userEvent.setup();
+    render(<MessageList {...TRASH_PROPS} initialNextCursor="cursor1" />);
+    await user.click(screen.getByRole('button', { name: /load more/i }));
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('folder=trash'));
+    });
+  });
+
+  test('does not subscribe to WebSocket events for trash folder', () => {
+    render(<MessageList {...TRASH_PROPS} />);
+    expect(mockSubscribe).not.toHaveBeenCalled();
+  });
+});
+
 describe('MessageList — card layout', () => {
   test('renders message snippet when provided', () => {
     const msgs = [{ ...INBOUND_MESSAGES[0], snippet: 'This is a preview of the email body' }];
