@@ -127,6 +127,13 @@ export function MessageList({ address, direction, folder, initialMessages, initi
 
   function handleRowClick(msg: Message) {
     const root = folder ?? (direction === 'outbound' ? 'sent' : 'inbox');
+    // Optimistically mark as read so the blue dot clears immediately on click,
+    // without waiting for the async PATCH in MessageDetail.
+    if (!isSent && !msg.isRead && (folder === 'inbox' || folder === 'junk' || !folder)) {
+      setMessages((prev) =>
+        prev.map((m) => m.messageId === msg.messageId ? { ...m, isRead: true } : m),
+      );
+    }
     router.push(`/${root}/${encodeURIComponent(address)}/${msg.messageId}`);
   }
 
