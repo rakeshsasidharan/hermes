@@ -98,6 +98,29 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
     }
   }
 
+  async function handleMoveToTrash() {
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/messages/${message.messageId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder: 'trash' }),
+      });
+      if (!res.ok) {
+        toast.error('Failed to move message to Trash');
+        return;
+      }
+      dispatchMessageRemoved(message.messageId);
+      toast.success('Moved to Trash');
+      router.push(listHref);
+      router.refresh();
+    } catch {
+      toast.error('Failed to move message to Trash');
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   async function handleDelete() {
     setIsDeleting(true);
     try {
@@ -212,14 +235,14 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
                   size="icon"
                   variant="ghost"
                   className="h-8 w-8"
-                  onClick={handleDelete}
+                  onClick={folder === 'inbox' ? handleMoveToTrash : handleDelete}
                   disabled={isDeleting}
-                  aria-label="Delete"
+                  aria-label={folder === 'inbox' ? 'Move to Trash' : 'Delete'}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Delete</TooltipContent>
+              <TooltipContent>{folder === 'inbox' ? 'Move to Trash' : 'Delete'}</TooltipContent>
             </Tooltip>
 
             <Separator orientation="vertical" className="h-5 mx-1" />
