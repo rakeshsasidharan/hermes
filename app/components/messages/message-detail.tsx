@@ -158,7 +158,7 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
 
         <TooltipProvider delayDuration={300}>
           <div className="flex items-center gap-1 shrink-0">
-            {folder === 'junk' ? (
+            {(folder === 'junk' || folder === 'trash') ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button

@@ -179,6 +179,55 @@ describe('MessageDetail', () => {
   });
 });
 
+describe('MessageDetail — trash folder', () => {
+  beforeEach(() => {
+    global.fetch = jest.fn();
+    mockPathname.mockReturnValue('/trash/test%40example.com/msg-1');
+  });
+
+  test('shows Restore to Inbox button when in trash folder', () => {
+    render(<MessageDetail message={BASE_MSG} />);
+    expect(screen.getByRole('button', { name: /restore to inbox/i })).toBeInTheDocument();
+  });
+
+  test('does not show Move to Junk button when in trash folder', () => {
+    render(<MessageDetail message={BASE_MSG} />);
+    expect(screen.queryByRole('button', { name: /move to junk/i })).not.toBeInTheDocument();
+  });
+
+  test('does not show read toggle when in trash folder', () => {
+    render(<MessageDetail message={BASE_MSG} />);
+    expect(screen.queryByRole('button', { name: /mark as (un)?read/i })).not.toBeInTheDocument();
+  });
+
+  test('calls PATCH with folder=inbox on Restore to Inbox click', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({}) });
+    const user = userEvent.setup();
+    render(<MessageDetail message={BASE_MSG} />);
+    await user.click(screen.getByRole('button', { name: /restore to inbox/i }));
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/messages/msg-1',
+        expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ folder: 'inbox' }) }),
+      );
+    });
+  });
+
+  test('dispatches hermes:messageremoved after Restore to Inbox from trash', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({}) });
+    const events: CustomEvent[] = [];
+    window.addEventListener('hermes:messageremoved', (e) => events.push(e as CustomEvent));
+    const user = userEvent.setup();
+    render(<MessageDetail message={BASE_MSG} />);
+    await user.click(screen.getByRole('button', { name: /restore to inbox/i }));
+    await waitFor(() => {
+      expect(events.length).toBeGreaterThan(0);
+      expect(events[0].detail).toEqual({ messageId: 'msg-1' });
+    });
+    window.removeEventListener('hermes:messageremoved', (e) => events.push(e as CustomEvent));
+  });
+});
+
 describe('MessageDetail — junk folder', () => {
   beforeEach(() => {
     global.fetch = jest.fn();
