@@ -164,18 +164,92 @@ describe('MessageDetail', () => {
     expect(screen.getByTestId('reply-cc')).toBeInTheDocument();
   });
 
-  test('dispatches hermes:messageremoved after delete', async () => {
+  test('dispatches hermes:messageremoved after permanent delete from junk', async () => {
+    mockPathname.mockReturnValue('/junk/test%40example.com/msg-1');
     (global.fetch as jest.Mock).mockResolvedValue({ ok: true });
     const events: CustomEvent[] = [];
     window.addEventListener('hermes:messageremoved', (e) => events.push(e as CustomEvent));
     const user = userEvent.setup();
     render(<MessageDetail message={BASE_MSG} />);
-    await user.click(screen.getByRole('button', { name: /delete/i }));
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
     await waitFor(() => {
       expect(events.length).toBeGreaterThan(0);
       expect(events[0].detail).toEqual({ messageId: 'msg-1' });
     });
     window.removeEventListener('hermes:messageremoved', (e) => events.push(e as CustomEvent));
+  });
+});
+
+describe('MessageDetail — Move to Trash', () => {
+  beforeEach(() => {
+    global.fetch = jest.fn();
+    mockPathname.mockReturnValue('/inbox/test%40example.com/msg-1');
+  });
+
+  test('inbox Delete button has aria-label Move to Trash', () => {
+    render(<MessageDetail message={BASE_MSG} />);
+    expect(screen.getByRole('button', { name: /move to trash/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^delete$/i })).not.toBeInTheDocument();
+  });
+
+  test('calls PATCH with folder=trash when Move to Trash clicked from inbox', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({}) });
+    const user = userEvent.setup();
+    render(<MessageDetail message={BASE_MSG} />);
+    await user.click(screen.getByRole('button', { name: /move to trash/i }));
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/messages/msg-1',
+        expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ folder: 'trash' }) }),
+      );
+    });
+  });
+
+  test('dispatches hermes:messageremoved after Move to Trash', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({}) });
+    const events: CustomEvent[] = [];
+    window.addEventListener('hermes:messageremoved', (e) => events.push(e as CustomEvent));
+    const user = userEvent.setup();
+    render(<MessageDetail message={BASE_MSG} />);
+    await user.click(screen.getByRole('button', { name: /move to trash/i }));
+    await waitFor(() => {
+      expect(events.length).toBeGreaterThan(0);
+      expect(events[0].detail).toEqual({ messageId: 'msg-1' });
+    });
+    window.removeEventListener('hermes:messageremoved', (e) => events.push(e as CustomEvent));
+  });
+
+  test('calls toast.error when Move to Trash fails', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: false });
+    const user = userEvent.setup();
+    render(<MessageDetail message={BASE_MSG} />);
+    await user.click(screen.getByRole('button', { name: /move to trash/i }));
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith(expect.stringMatching(/failed to move/i));
+    });
+  });
+});
+
+describe('MessageDetail — Delete (permanent) from junk and trash', () => {
+  test('junk Delete button has aria-label Delete (not Move to Trash)', () => {
+    mockPathname.mockReturnValue('/junk/test%40example.com/msg-1');
+    render(<MessageDetail message={BASE_MSG} />);
+    expect(screen.getByRole('button', { name: /^delete$/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /move to trash/i })).not.toBeInTheDocument();
+  });
+
+  test('trash Delete button uses permanent DELETE', async () => {
+    mockPathname.mockReturnValue('/trash/test%40example.com/msg-1');
+    global.fetch = jest.fn().mockResolvedValue({ ok: true });
+    const user = userEvent.setup();
+    render(<MessageDetail message={BASE_MSG} />);
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/messages/msg-1',
+        expect.objectContaining({ method: 'DELETE' }),
+      );
+    });
   });
 });
 
