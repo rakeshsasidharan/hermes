@@ -140,8 +140,24 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
     }
   }
 
-  function handleMoveToJunk() {
-    toast.info('Move to Junk coming soon', { id: 'move-to-junk' });
+  async function handleMoveToJunk() {
+    try {
+      const res = await fetch(`/api/messages/${message.messageId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder: 'junk' }),
+      });
+      if (!res.ok) {
+        toast.error('Failed to move message to Junk');
+        return;
+      }
+      dispatchMessageRemoved(message.messageId);
+      toast.success('Moved to Junk');
+      router.push(listHref);
+      router.refresh();
+    } catch {
+      toast.error('Failed to move message to Junk');
+    }
   }
 
   const currentAddress = message.address ?? (isSent ? message.from : message.to) ?? '';
