@@ -45,6 +45,7 @@ export function MessageList({ address, direction, folder, initialMessages, initi
   const [nextCursor, setNextCursor] = useState<string | null>(initialNextCursor);
   const [filter, setFilter] = useState<Filter>('all');
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingMessageId, setPendingMessageId] = useState<string | null>(null);
 
   const isInboxFolder = folder === 'inbox' || (!folder && direction === 'inbound');
 
@@ -52,6 +53,11 @@ export function MessageList({ address, direction, folder, initialMessages, initi
     const segments = pathname.split('/');
     return segments.length >= 4 ? segments[3] : null;
   })();
+
+  // Clear pending state once the navigation lands
+  useEffect(() => {
+    setPendingMessageId(null);
+  }, [pathname]);
 
   useEffect(() => {
     if (!isInboxFolder) return;
@@ -126,6 +132,7 @@ export function MessageList({ address, direction, folder, initialMessages, initi
   }, [address, direction, folder]);
 
   function handleRowClick(msg: Message) {
+    setPendingMessageId(msg.messageId);
     const root = folder ?? (direction === 'outbound' ? 'sent' : 'inbox');
     // Optimistically mark as read so the blue dot clears immediately on click,
     // without waiting for the async PATCH in MessageDetail.
@@ -196,7 +203,7 @@ export function MessageList({ address, direction, folder, initialMessages, initi
           <>
             <div className="flex flex-col gap-2 p-2">
               {displayed.map((msg) => {
-                const isActive = msg.messageId === activeMessageId;
+                const isActive = msg.messageId === activeMessageId || msg.messageId === pendingMessageId;
                 const isUnread = !isSent && !msg.isRead;
                 const displayName = isSent
                   ? extractDisplayName(msg.to ?? '')
@@ -207,6 +214,7 @@ export function MessageList({ address, direction, folder, initialMessages, initi
                     key={msg.messageId}
                     testId={`message-row-${msg.messageId}`}
                     isActive={isActive}
+                    isLoading={msg.messageId === pendingMessageId}
                     isUnread={isUnread}
                     displayName={displayName}
                     date={formatMailboxDate(msg.receivedAt)}

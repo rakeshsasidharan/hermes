@@ -1,10 +1,11 @@
 import { Badge } from '@/components/ui/badge';
-import { Paperclip } from 'lucide-react';
+import { Loader2, Paperclip } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface MailboxCardProps {
   testId: string;
   isActive: boolean;
+  isLoading?: boolean;
   isUnread?: boolean;
   displayName: string;
   date: string;
@@ -17,6 +18,7 @@ export interface MailboxCardProps {
 export function MailboxCard({
   testId,
   isActive,
+  isLoading = false,
   isUnread = false,
   displayName,
   date,
@@ -52,7 +54,10 @@ export function MailboxCard({
           </span>
         </div>
         <div className="flex items-center gap-1 shrink-0 text-xs text-muted-foreground">
-          {hasAttachments && <Paperclip className="h-3 w-3" />}
+          {isLoading
+            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            : hasAttachments && <Paperclip className="h-3 w-3" />
+          }
           <span>{date}</span>
         </div>
       </div>

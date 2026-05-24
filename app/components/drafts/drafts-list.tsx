@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { FileText } from 'lucide-react';
 import { MailboxCard, formatMailboxDate } from '@/components/mailbox-card';
@@ -25,21 +26,30 @@ interface DraftsListProps {
 export function DraftsList({ drafts }: DraftsListProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const [pendingDraftId, setPendingDraftId] = useState<string | null>(null);
 
   const activeDraftId = (() => {
     const segments = pathname.split('/');
     return segments.length >= 4 ? segments[3] : null;
   })();
 
+  useEffect(() => {
+    setPendingDraftId(null);
+  }, [pathname]);
+
   function handleDraftClick(draft: Draft) {
     if (draft.inReplyToMessageId) {
       const address = encodeURIComponent(draft.from ?? '');
       const inReplyTo = draft.inReplyToMessageId;
-      tryNavigate(() => router.push(
-        `/inbox/${address}/${encodeURIComponent(inReplyTo)}?draftId=${draft.draftId}&mode=reply`,
-      ));
+      tryNavigate(() => {
+        setPendingDraftId(draft.draftId);
+        router.push(`/inbox/${address}/${encodeURIComponent(inReplyTo)}?draftId=${draft.draftId}&mode=reply`);
+      });
     } else {
-      tryNavigate(() => router.push(`/drafts/${encodeURIComponent(draft.from ?? '')}/${draft.draftId}`));
+      tryNavigate(() => {
+        setPendingDraftId(draft.draftId);
+        router.push(`/drafts/${encodeURIComponent(draft.from ?? '')}/${draft.draftId}`);
+      });
     }
   }
 
@@ -61,7 +71,8 @@ export function DraftsList({ drafts }: DraftsListProps) {
         <MailboxCard
           key={draft.draftId}
           testId={`draft-row-${draft.draftId}`}
-          isActive={draft.draftId === activeDraftId}
+          isActive={draft.draftId === activeDraftId || draft.draftId === pendingDraftId}
+          isLoading={draft.draftId === pendingDraftId}
           displayName={draft.to?.trim() || 'No recipient'}
           date={formatMailboxDate(draft.updatedAt)}
           subject={draft.subject?.trim() || '(no subject)'}

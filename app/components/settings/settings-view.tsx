@@ -1,10 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Loader2 } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -48,10 +50,16 @@ function addressStatusLabel(status: string): string {
 
 export function SettingsView({ domains, addresses }: SettingsViewProps) {
   const router = useRouter();
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   async function handleSignOut() {
-    await fetch('/api/auth/signout', { method: 'POST' });
-    router.push('/login');
+    setIsSigningOut(true);
+    try {
+      await fetch('/api/auth/signout', { method: 'POST' });
+      router.push('/login');
+    } catch {
+      setIsSigningOut(false);
+    }
   }
 
   return (
@@ -135,8 +143,10 @@ export function SettingsView({ domains, addresses }: SettingsViewProps) {
         <Button
           variant="destructive"
           onClick={handleSignOut}
+          disabled={isSigningOut}
           data-testid="sign-out-button"
         >
+          {isSigningOut && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Sign out
         </Button>
       </div>
