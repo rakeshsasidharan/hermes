@@ -319,7 +319,7 @@ describe('PATCH /api/messages/:id', () => {
     expect(body.error).toBe('Message not found');
   });
 
-  test('returns 400 when isRead is missing', async () => {
+  test('returns 400 when neither isRead nor folder is provided', async () => {
     const res = await PATCH(makePatchReq('msg-1', {}), makeParams('msg-1'));
     const body = await res.json();
 
@@ -333,6 +333,48 @@ describe('PATCH /api/messages/:id', () => {
 
     expect(res.status).toBe(400);
     expect(body.error).toContain('isRead');
+  });
+
+  test('moves message to junk folder', async () => {
+    mockDynamoSend.mockResolvedValueOnce({ Item: EXISTING_ITEM });
+    mockDynamoSend.mockResolvedValueOnce({ Attributes: { ...EXISTING_ITEM, folder: 'junk' } });
+
+    const res = await PATCH(makePatchReq('msg-1', { folder: 'junk' }), makeParams('msg-1'));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.message.folder).toBe('junk');
+  });
+
+  test('restores message to inbox folder', async () => {
+    mockDynamoSend.mockResolvedValueOnce({ Item: { ...EXISTING_ITEM, folder: 'junk' } });
+    mockDynamoSend.mockResolvedValueOnce({ Attributes: { ...EXISTING_ITEM, folder: 'inbox' } });
+
+    const res = await PATCH(makePatchReq('msg-1', { folder: 'inbox' }), makeParams('msg-1'));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.message.folder).toBe('inbox');
+  });
+
+  test('returns 400 for invalid folder value', async () => {
+    const res = await PATCH(makePatchReq('msg-1', { folder: 'spam' }), makeParams('msg-1'));
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toContain('folder');
+  });
+
+  test('updates both isRead and folder in a single request', async () => {
+    mockDynamoSend.mockResolvedValueOnce({ Item: EXISTING_ITEM });
+    mockDynamoSend.mockResolvedValueOnce({ Attributes: { ...EXISTING_ITEM, isRead: true, folder: 'junk' } });
+
+    const res = await PATCH(makePatchReq('msg-1', { isRead: true, folder: 'junk' }), makeParams('msg-1'));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.message.isRead).toBe(true);
+    expect(body.message.folder).toBe('junk');
   });
 
   test('returns 400 for invalid JSON body', async () => {

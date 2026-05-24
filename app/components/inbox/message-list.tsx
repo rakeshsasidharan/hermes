@@ -29,6 +29,7 @@ interface Message {
 interface MessageListProps {
   address: string;
   direction: 'inbound' | 'outbound';
+  folder?: 'inbox' | 'junk' | 'trash';
   initialMessages: Message[];
   initialNextCursor: string | null;
   folderLabel: string;
@@ -36,7 +37,7 @@ interface MessageListProps {
 
 type Filter = 'all' | 'unread';
 
-export function MessageList({ address, direction, initialMessages, initialNextCursor, folderLabel }: MessageListProps) {
+export function MessageList({ address, direction, folder, initialMessages, initialNextCursor, folderLabel }: MessageListProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { subscribe } = useWs();
@@ -45,13 +46,15 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
   const [filter, setFilter] = useState<Filter>('all');
   const [isLoading, setIsLoading] = useState(false);
 
+  const isInboxFolder = folder === 'inbox' || (!folder && direction === 'inbound');
+
   const activeMessageId = (() => {
     const segments = pathname.split('/');
     return segments.length >= 4 ? segments[3] : null;
   })();
 
   useEffect(() => {
-    if (direction !== 'inbound') return;
+    if (!isInboxFolder) return;
     return subscribe((event) => {
       if (event.address.toLowerCase() !== address.toLowerCase()) return;
       // The WS payload only carries the messageId; fetch the full record.
@@ -67,7 +70,7 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
         })
         .catch(() => null);
     });
-  }, [subscribe, address, direction]);
+  }, [subscribe, address, isInboxFolder]);
 
   useEffect(() => {
     function onReadStatus(e: Event) {
@@ -81,16 +84,30 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
   }, []);
 
   useEffect(() => {
-    if (direction !== 'inbound') return;
+    function onMessageRemoved(e: Event) {
+      const { messageId } = (e as CustomEvent<{ messageId: string }>).detail;
+      setMessages((prev) => prev.filter((m) => m.messageId !== messageId));
+    }
+    window.addEventListener('hermes:messageremoved', onMessageRemoved);
+    return () => window.removeEventListener('hermes:messageremoved', onMessageRemoved);
+  }, []);
+
+  useEffect(() => {
+    if (!isInboxFolder) return;
     const unreadCount = messages.filter((m) => !m.isRead).length;
     window.dispatchEvent(
       new CustomEvent('hermes:inboxcount', { detail: { address, unreadCount } }),
     );
-  }, [messages, address, direction]);
+  }, [messages, address, isInboxFolder]);
 
   const fetchMessages = useCallback(async (cursor?: string) => {
     setIsLoading(true);
-    const params = new URLSearchParams({ address, direction });
+    const params = new URLSearchParams({ address });
+    if (folder) {
+      params.set('folder', folder);
+    } else {
+      params.set('direction', direction);
+    }
     if (cursor) params.set('cursor', cursor);
 
     try {
@@ -106,10 +123,10 @@ export function MessageList({ address, direction, initialMessages, initialNextCu
     } finally {
       setIsLoading(false);
     }
-  }, [address, direction]);
+  }, [address, direction, folder]);
 
   function handleRowClick(msg: Message) {
-    const root = direction === 'outbound' ? 'sent' : 'inbox';
+    const root = folder ?? (direction === 'outbound' ? 'sent' : 'inbox');
     router.push(`/${root}/${encodeURIComponent(address)}/${msg.messageId}`);
   }
 

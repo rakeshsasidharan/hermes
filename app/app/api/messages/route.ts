@@ -53,6 +53,7 @@ export async function GET(req: NextRequest) {
   const from = searchParams.get('from');
   const to = searchParams.get('to');
   const direction = searchParams.get('direction');
+  const folder = searchParams.get('folder');
 
   const filterConditions: string[] = [];
   const expressionAttributeNames: Record<string, string> = {};
@@ -80,7 +81,20 @@ export async function GET(req: NextRequest) {
     expressionAttributeValues[':to'] = `${to}T23:59:59.999Z`;
   }
 
-  if (direction) {
+  if (folder === 'inbox') {
+    // Inbox: inbound messages not moved to junk/trash.
+    // attribute_not_exists handles legacy messages written before the folder field was added.
+    filterConditions.push('#direction = :inbound');
+    filterConditions.push('(#folder = :folder OR attribute_not_exists(#folder))');
+    expressionAttributeNames['#direction'] = 'direction';
+    expressionAttributeNames['#folder'] = 'folder';
+    expressionAttributeValues[':inbound'] = 'inbound';
+    expressionAttributeValues[':folder'] = 'inbox';
+  } else if (folder) {
+    filterConditions.push('#folder = :folder');
+    expressionAttributeNames['#folder'] = 'folder';
+    expressionAttributeValues[':folder'] = folder;
+  } else if (direction) {
     filterConditions.push('#direction = :direction');
     expressionAttributeNames['#direction'] = 'direction';
     expressionAttributeValues[':direction'] = direction;

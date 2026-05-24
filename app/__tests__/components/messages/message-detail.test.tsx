@@ -9,6 +9,17 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
 }));
 
+const mockToastError = jest.fn();
+const mockToastSuccess = jest.fn();
+const mockToastInfo = jest.fn();
+jest.mock('sonner', () => ({
+  toast: {
+    error: (...args: unknown[]) => mockToastError(...args),
+    success: (...args: unknown[]) => mockToastSuccess(...args),
+    info: (...args: unknown[]) => mockToastInfo(...args),
+  },
+}));
+
 
 beforeEach(() => {
   global.fetch = jest.fn();
@@ -151,5 +162,78 @@ describe('MessageDetail', () => {
     await user.click(screen.getByRole('button', { name: /reply all/i }));
     expect(screen.getByTestId('reply-composer')).toBeInTheDocument();
     expect(screen.getByTestId('reply-cc')).toBeInTheDocument();
+  });
+
+  test('dispatches hermes:messageremoved after delete', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true });
+    const events: CustomEvent[] = [];
+    window.addEventListener('hermes:messageremoved', (e) => events.push(e as CustomEvent));
+    const user = userEvent.setup();
+    render(<MessageDetail message={BASE_MSG} />);
+    await user.click(screen.getByRole('button', { name: /delete/i }));
+    await waitFor(() => {
+      expect(events.length).toBeGreaterThan(0);
+      expect(events[0].detail).toEqual({ messageId: 'msg-1' });
+    });
+    window.removeEventListener('hermes:messageremoved', (e) => events.push(e as CustomEvent));
+  });
+});
+
+describe('MessageDetail — junk folder', () => {
+  beforeEach(() => {
+    global.fetch = jest.fn();
+    mockPathname.mockReturnValue('/junk/test%40example.com/msg-1');
+  });
+
+  test('shows Restore to Inbox button when in junk folder', () => {
+    render(<MessageDetail message={BASE_MSG} />);
+    expect(screen.getByRole('button', { name: /restore to inbox/i })).toBeInTheDocument();
+  });
+
+  test('does not show Move to Junk button when in junk folder', () => {
+    render(<MessageDetail message={BASE_MSG} />);
+    expect(screen.queryByRole('button', { name: /move to junk/i })).not.toBeInTheDocument();
+  });
+
+  test('shows read toggle when in junk folder', () => {
+    render(<MessageDetail message={BASE_MSG} />);
+    expect(screen.getByRole('button', { name: /mark as (un)?read/i })).toBeInTheDocument();
+  });
+
+  test('calls PATCH with folder=inbox on Restore to Inbox click', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({}) });
+    const user = userEvent.setup();
+    render(<MessageDetail message={BASE_MSG} />);
+    await user.click(screen.getByRole('button', { name: /restore to inbox/i }));
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/messages/msg-1',
+        expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ folder: 'inbox' }) }),
+      );
+    });
+  });
+
+  test('dispatches hermes:messageremoved after Restore to Inbox', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({}) });
+    const events: CustomEvent[] = [];
+    window.addEventListener('hermes:messageremoved', (e) => events.push(e as CustomEvent));
+    const user = userEvent.setup();
+    render(<MessageDetail message={BASE_MSG} />);
+    await user.click(screen.getByRole('button', { name: /restore to inbox/i }));
+    await waitFor(() => {
+      expect(events.length).toBeGreaterThan(0);
+      expect(events[0].detail).toEqual({ messageId: 'msg-1' });
+    });
+    window.removeEventListener('hermes:messageremoved', (e) => events.push(e as CustomEvent));
+  });
+
+  test('calls toast.error when Restore to Inbox fails', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: false });
+    const user = userEvent.setup();
+    render(<MessageDetail message={BASE_MSG} />);
+    await user.click(screen.getByRole('button', { name: /restore to inbox/i }));
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith(expect.stringMatching(/failed to restore/i));
+    });
   });
 });
