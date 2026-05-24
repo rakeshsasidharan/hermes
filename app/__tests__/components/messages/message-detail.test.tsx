@@ -179,6 +179,50 @@ describe('MessageDetail', () => {
   });
 });
 
+describe('MessageDetail — Move to Junk', () => {
+  beforeEach(() => {
+    global.fetch = jest.fn();
+    mockPathname.mockReturnValue('/inbox/test%40example.com/msg-1');
+  });
+
+  test('calls PATCH with folder=junk on Move to Junk click', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({}) });
+    const user = userEvent.setup();
+    render(<MessageDetail message={BASE_MSG} />);
+    await user.click(screen.getByRole('button', { name: /move to junk/i }));
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/messages/msg-1',
+        expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ folder: 'junk' }) }),
+      );
+    });
+  });
+
+  test('dispatches hermes:messageremoved after Move to Junk', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({}) });
+    const events: CustomEvent[] = [];
+    window.addEventListener('hermes:messageremoved', (e) => events.push(e as CustomEvent));
+    const user = userEvent.setup();
+    render(<MessageDetail message={BASE_MSG} />);
+    await user.click(screen.getByRole('button', { name: /move to junk/i }));
+    await waitFor(() => {
+      expect(events.length).toBeGreaterThan(0);
+      expect(events[0].detail).toEqual({ messageId: 'msg-1' });
+    });
+    window.removeEventListener('hermes:messageremoved', (e) => events.push(e as CustomEvent));
+  });
+
+  test('calls toast.error when Move to Junk fails', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: false });
+    const user = userEvent.setup();
+    render(<MessageDetail message={BASE_MSG} />);
+    await user.click(screen.getByRole('button', { name: /move to junk/i }));
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith(expect.stringMatching(/failed to move/i));
+    });
+  });
+});
+
 describe('MessageDetail — trash folder', () => {
   beforeEach(() => {
     global.fetch = jest.fn();
