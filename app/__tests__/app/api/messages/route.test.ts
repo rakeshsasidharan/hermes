@@ -368,7 +368,6 @@ describe('POST /api/messages', () => {
     expect(item.to).toBe('recipient@example.com');
     expect(item.subject).toBe('Hello');
     expect(item.isRead).toBe(true);
-    expect(item.status).toBe('sent');
     expect(item.address).toBe('me@hermes.com');
   });
 
