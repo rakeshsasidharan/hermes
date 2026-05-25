@@ -68,6 +68,29 @@ async function fetchRecentMessages(
     .slice(0, 5);
 }
 
+async function fetchMessageCounts(
+  cookieHeader: string,
+  addresses: Address[],
+): Promise<{ total: number; unread: number }> {
+  if (addresses.length === 0) return { total: 0, unread: 0 };
+
+  const perAddress = await Promise.all(
+    addresses.map(async (addr) => {
+      const url = `${BASE}/api/messages/count?address=${encodeURIComponent(addr.email)}`;
+      const res = await fetch(url, {
+        headers: { Cookie: cookieHeader },
+        cache: 'no-store',
+      });
+      return res.ok ? ((await res.json()) as { total: number; unread: number }) : { total: 0, unread: 0 };
+    }),
+  );
+
+  return perAddress.reduce(
+    (acc, cur) => ({ total: acc.total + cur.total, unread: acc.unread + cur.unread }),
+    { total: 0, unread: 0 },
+  );
+}
+
 function formatRelativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60_000);
@@ -87,14 +110,16 @@ export default async function DashboardPage() {
     fetchAddresses(cookieHeader),
   ]);
 
-  const recentMessages = await fetchRecentMessages(cookieHeader, addresses);
+  const [recentMessages, messageCounts] = await Promise.all([
+    fetchRecentMessages(cookieHeader, addresses),
+    fetchMessageCounts(cookieHeader, addresses),
+  ]);
 
   const verified = domains.filter((d) => d.status === 'Verified').length;
   const pending = domains.filter((d) => d.status === 'Pending').length;
   const failed = domains.filter((d) => d.status === 'Failed').length;
 
-  const totalMessages = recentMessages.length;
-  const unreadMessages = recentMessages.filter((m) => !m.isRead).length;
+  const { total: totalMessages, unread: unreadMessages } = messageCounts;
 
   return (
     <div className=" space-y-6">
