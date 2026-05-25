@@ -59,8 +59,8 @@ export function DraftsList({ drafts }: DraftsListProps) {
         className="flex flex-col items-center justify-center gap-3 py-20 text-center h-full"
         data-testid="drafts-empty-state"
       >
-        <FileText className="h-10 w-10 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">No drafts saved yet</p>
+        <FileText className="h-12 w-12 text-muted-foreground opacity-20" />
+        <p className="text-sm text-muted-foreground ">No drafts saved yet</p>
       </div>
     );
   }
