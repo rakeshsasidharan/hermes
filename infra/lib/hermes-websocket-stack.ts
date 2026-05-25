@@ -17,6 +17,7 @@ export interface HermesWebSocketStackProps extends cdk.StackProps {
 export class HermesWebSocketStack extends cdk.Stack {
   public readonly webSocketApi: apigatewayv2.WebSocketApi;
   public readonly webSocketEndpoint: string;
+  public readonly webSocketCallbackEndpoint: string;
   public readonly webSocketApiArn: string;
 
   constructor(scope: Construct, id: string, props: HermesWebSocketStackProps) {
@@ -77,6 +78,8 @@ export class HermesWebSocketStack extends cdk.Stack {
     });
 
     this.webSocketEndpoint = stage.url;
+    // ApiGatewayManagementApiClient requires https://, not wss://
+    this.webSocketCallbackEndpoint = `https://${this.webSocketApi.apiId}.execute-api.${this.region}.amazonaws.com/${stage.stageName}`;
     this.webSocketApiArn = this.formatArn({
       service: 'execute-api',
       resource: this.webSocketApi.apiId,

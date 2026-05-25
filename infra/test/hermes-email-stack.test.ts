@@ -7,7 +7,7 @@ import { HermesEmailStack } from '../lib/hermes-email-stack';
 const MOCK_BUCKET_ARN = 'arn:aws:s3:::hermes-email-store';
 const MOCK_MESSAGES_TABLE_ARN = 'arn:aws:dynamodb:us-east-1:123456789012:table/hermes-messages';
 const MOCK_WS_TABLE_ARN = 'arn:aws:dynamodb:us-east-1:123456789012:table/hermes-ws-connections';
-const MOCK_WS_ENDPOINT = 'wss://abc123.execute-api.us-east-1.amazonaws.com/prod';
+const MOCK_WS_ENDPOINT = 'https://abc123.execute-api.us-east-1.amazonaws.com/prod';
 const MOCK_WS_API_ARN = 'arn:aws:execute-api:us-east-1:123456789012:abc123';
 
 describe('HermesEmailStack', () => {
@@ -24,7 +24,7 @@ describe('HermesEmailStack', () => {
       emailBucket,
       messagesTable,
       wsConnectionsTable: wsTable,
-      websocketApiEndpoint: MOCK_WS_ENDPOINT,
+      websocketCallbackEndpoint: MOCK_WS_ENDPOINT,
       websocketApiArn: MOCK_WS_API_ARN,
     });
     template = Template.fromStack(stack);
