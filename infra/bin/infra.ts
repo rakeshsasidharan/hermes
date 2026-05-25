@@ -50,7 +50,7 @@ const emailStack = new HermesEmailStack(app, 'HermesEmailStack', {
   emailBucket: storageStack.emailBucket,
   messagesTable: storageStack.messagesTable,
   wsConnectionsTable: storageStack.wsConnectionsTable,
-  websocketApiEndpoint: webSocketStack.webSocketEndpoint,
+  websocketCallbackEndpoint: webSocketStack.webSocketCallbackEndpoint,
   websocketApiArn: webSocketStack.webSocketApiArn,
   sesRuleSetName: config.sesRuleSetName,
 });

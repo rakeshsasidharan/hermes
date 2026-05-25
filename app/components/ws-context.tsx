@@ -36,7 +36,7 @@ export function WebSocketProvider({ children, token, wsEndpoint }: WebSocketProv
   useEffect(() => {
     if (!token || !wsEndpoint) return;
 
-    const manager = new WebSocketManager(wsEndpoint, token, (event) => {
+    const manager = new WebSocketManager(wsEndpoint, () => token, (event) => {
       handlersRef.current.forEach((h) => h(event));
     });
     manager.connect();

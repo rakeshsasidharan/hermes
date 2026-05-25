@@ -18,7 +18,7 @@ export interface HermesEmailStackProps extends cdk.StackProps {
   emailBucket: s3.IBucket;
   messagesTable: dynamodb.ITable;
   wsConnectionsTable: dynamodb.ITable;
-  websocketApiEndpoint: string;
+  websocketCallbackEndpoint: string;
   websocketApiArn: string;
   sesRuleSetName?: string;
 }
@@ -108,7 +108,7 @@ export class HermesEmailStack extends cdk.Stack {
         MESSAGES_TABLE: props.messagesTable.tableName,
         WS_CONNECTIONS_TABLE: props.wsConnectionsTable.tableName,
         S3_BUCKET: props.emailBucket.bucketName,
-        WEBSOCKET_API_ENDPOINT: props.websocketApiEndpoint,
+        WEBSOCKET_API_ENDPOINT: props.websocketCallbackEndpoint,
       },
     });
     cdk.Tags.of(this.inboundEmailProcessor).add(HERMES_TAG.key, HERMES_TAG.value);

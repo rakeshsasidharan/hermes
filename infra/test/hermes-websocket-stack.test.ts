@@ -53,6 +53,23 @@ describe('HermesWebSocketStack', () => {
         Export: { Name: 'HermesWebSocketEndpoint' },
       });
     });
+
+    test('webSocketCallbackEndpoint uses https:// not wss://', () => {
+      const app = new cdk.App();
+      const helperStack = new cdk.Stack(app, 'HelperStack2');
+      const wsTable2 = dynamodb.Table.fromTableArn(
+        helperStack,
+        'MockWsTable2',
+        'arn:aws:dynamodb:us-east-1:123456789012:table/hermes-ws-connections',
+      );
+      const stack2 = new HermesWebSocketStack(app, 'TestStack2', {
+        wsConnectionsTable: wsTable2,
+        userPoolId: 'us-east-1_testPool',
+        env: { account: '123456789012', region: 'us-east-1' },
+      });
+      expect(stack2.webSocketCallbackEndpoint).toMatch(/^https:\/\//);
+      expect(stack2.webSocketCallbackEndpoint).not.toMatch(/^wss:\/\//);
+    });
   });
 
   describe('WsConnectHandler Lambda', () => {

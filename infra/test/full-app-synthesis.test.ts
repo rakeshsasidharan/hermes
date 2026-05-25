@@ -32,7 +32,7 @@ function buildApp() {
     emailBucket: storageStack.emailBucket,
     messagesTable: storageStack.messagesTable,
     wsConnectionsTable: storageStack.wsConnectionsTable,
-    websocketApiEndpoint: webSocketStack.webSocketEndpoint,
+    websocketCallbackEndpoint: webSocketStack.webSocketCallbackEndpoint,
     websocketApiArn: webSocketStack.webSocketApiArn,
   });
 

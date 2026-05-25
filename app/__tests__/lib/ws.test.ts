@@ -73,8 +73,8 @@ describe('WebSocketManager', () => {
   const WS_URL = 'wss://example.execute-api.us-east-1.amazonaws.com/prod';
   const TOKEN = 'test-token-123';
 
-  function makeManager(onMessage = jest.fn()) {
-    return new WebSocketManager(WS_URL, TOKEN, onMessage);
+  function makeManager(onMessage = jest.fn(), getToken: () => string = () => TOKEN) {
+    return new WebSocketManager(WS_URL, getToken, onMessage);
   }
 
   describe('connect', () => {
@@ -86,6 +86,20 @@ describe('WebSocketManager', () => {
       expect(MockWebSocket.instances[0].url).toBe(
         `${WS_URL}?token=${encodeURIComponent(TOKEN)}`,
       );
+    });
+
+    test('calls getToken on every connect so a refreshed token is used on reconnect', () => {
+      let currentToken = 'token-v1';
+      const manager = makeManager(jest.fn(), () => currentToken);
+      manager.connect();
+      expect(MockWebSocket.instances[0].url).toContain('token-v1');
+
+      MockWebSocket.instances[0].simulateClose();
+      currentToken = 'token-v2';
+      jest.advanceTimersByTime(1_000);
+
+      expect(MockWebSocket.instances).toHaveLength(2);
+      expect(MockWebSocket.instances[1].url).toContain('token-v2');
     });
 
     test('does not open a second socket if already OPEN', () => {
