@@ -15,7 +15,7 @@ export class WebSocketManager {
 
   constructor(
     private readonly url: string,
-    private readonly token: string,
+    private readonly getToken: () => string,
     private readonly onMessage: MessageHandler,
   ) {}
 
@@ -27,7 +27,7 @@ export class WebSocketManager {
       return;
     }
 
-    const wsUrl = `${this.url}?token=${encodeURIComponent(this.token)}`;
+    const wsUrl = `${this.url}?token=${encodeURIComponent(this.getToken())}`;
     this.socket = new WebSocket(wsUrl);
 
     this.socket.onopen = () => {
