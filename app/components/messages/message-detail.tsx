@@ -83,6 +83,9 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
       if (r.ok) {
         setIsRead(true);
         dispatchReadEvent(message.messageId, true);
+        // Bust the Next.js Router Cache so navigating back to the inbox
+        // re-fetches from the server and reflects the updated isRead state.
+        router.refresh();
       }
     }).catch(() => null);
   }, [message.messageId, message.isRead, showReadToggle]);
