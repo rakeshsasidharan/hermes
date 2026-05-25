@@ -129,10 +129,8 @@ export async function PATCH(
   const expressionAttributeValues: Record<string, unknown> = { ':now': new Date().toISOString() };
 
   if (hasIsRead) {
-    setClauses.push('isRead = :isRead', '#status = :status');
-    expressionAttributeNames['#status'] = 'status';
+    setClauses.push('isRead = :isRead');
     expressionAttributeValues[':isRead'] = isRead;
-    expressionAttributeValues[':status'] = isRead ? 'read' : 'unread';
   }
 
   if (hasFolder) {

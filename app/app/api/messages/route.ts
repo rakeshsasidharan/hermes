@@ -216,7 +216,6 @@ export async function POST(req: NextRequest) {
       ...(bcc ? { bcc: bcc as string } : {}),
       subject: subject as string,
       receivedAt: sentAt,
-      status: 'sent',
       isRead: true,
       bodyTextS3Key: bodyS3Key,
       snippet: (emailBody as string).replace(/\s+/g, ' ').trim().slice(0, 300) || undefined,

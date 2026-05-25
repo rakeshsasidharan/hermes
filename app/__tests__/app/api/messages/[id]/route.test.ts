@@ -69,7 +69,6 @@ const EXISTING_ITEM = {
   address: 'inbox@example.com',
   subject: 'Hello',
   isRead: false,
-  status: 'unread',
 };
 
 // ── GET /api/messages/:id ────────────────────────────────────────────────────
@@ -271,26 +270,26 @@ describe('PATCH /api/messages/:id', () => {
 
   test('marks message as read and returns updated item', async () => {
     mockDynamoSend.mockResolvedValueOnce({ Item: EXISTING_ITEM });
-    mockDynamoSend.mockResolvedValueOnce({ Attributes: { ...EXISTING_ITEM, isRead: true, status: 'read' } });
+    mockDynamoSend.mockResolvedValueOnce({ Attributes: { ...EXISTING_ITEM, isRead: true } });
 
     const res = await PATCH(makePatchReq('msg-1', { isRead: true }), makeParams('msg-1'));
     const body = await res.json();
 
     expect(res.status).toBe(200);
     expect(body.message.isRead).toBe(true);
-    expect(body.message.status).toBe('read');
+    expect(body.message.status).toBeUndefined();
   });
 
   test('marks message as unread and returns updated item', async () => {
-    mockDynamoSend.mockResolvedValueOnce({ Item: { ...EXISTING_ITEM, isRead: true, status: 'read' } });
-    mockDynamoSend.mockResolvedValueOnce({ Attributes: { ...EXISTING_ITEM, isRead: false, status: 'unread' } });
+    mockDynamoSend.mockResolvedValueOnce({ Item: { ...EXISTING_ITEM, isRead: true } });
+    mockDynamoSend.mockResolvedValueOnce({ Attributes: { ...EXISTING_ITEM, isRead: false } });
 
     const res = await PATCH(makePatchReq('msg-1', { isRead: false }), makeParams('msg-1'));
     const body = await res.json();
 
     expect(res.status).toBe(200);
     expect(body.message.isRead).toBe(false);
-    expect(body.message.status).toBe('unread');
+    expect(body.message.status).toBeUndefined();
   });
 
   test('writes correct UpdateExpression to DynamoDB', async () => {
@@ -305,8 +304,9 @@ describe('PATCH /api/messages/:id', () => {
     expect(updateCall).toMatchObject({
       TableName: 'hermes-messages',
       Key: { messageId: 'msg-1' },
-      ExpressionAttributeValues: expect.objectContaining({ ':isRead': true, ':status': 'read' }),
+      ExpressionAttributeValues: expect.objectContaining({ ':isRead': true }),
     });
+    expect((updateCall?.ExpressionAttributeValues as Record<string, unknown>)[':status']).toBeUndefined();
   });
 
   test('returns 404 for non-existent message', async () => {
