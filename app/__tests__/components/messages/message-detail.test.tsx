@@ -3,10 +3,11 @@ import userEvent from '@testing-library/user-event';
 import { MessageDetail } from '@/components/messages/message-detail';
 
 const mockPathname = jest.fn().mockReturnValue('/inbox/test%40example.com/msg-1');
+const mockRouterRefresh = jest.fn();
 
 jest.mock('next/navigation', () => ({
   usePathname: () => mockPathname(),
-  useRouter: () => ({ push: jest.fn() }),
+  useRouter: () => ({ push: jest.fn(), refresh: mockRouterRefresh }),
 }));
 
 const mockToastError = jest.fn();
@@ -100,6 +101,19 @@ describe('MessageDetail', () => {
       expect(events[0].detail).toEqual({ messageId: 'msg-1', isRead: true });
     });
     window.removeEventListener('hermes:readstatus', (e) => events.push(e as CustomEvent));
+  });
+
+  test('calls router.refresh after auto-marking as read to bust Router Cache', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({}) });
+    render(<MessageDetail message={{ ...BASE_MSG, isRead: false }} />);
+    await waitFor(() => {
+      expect(mockRouterRefresh).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  test('does not call router.refresh when message is already read', () => {
+    render(<MessageDetail message={{ ...BASE_MSG, isRead: true }} />);
+    expect(mockRouterRefresh).not.toHaveBeenCalled();
   });
 
   test('shows Mark as Unread button on inbox route', () => {
