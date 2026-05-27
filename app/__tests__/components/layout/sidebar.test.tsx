@@ -291,6 +291,97 @@ describe('AppSidebar', () => {
     expect(screen.getByTestId('compose-button')).toBeDisabled();
   });
 
+  describe('address dropdown sorting', () => {
+    test('sorts addresses by domain alphabetically', async () => {
+      const user = userEvent.setup();
+      const addresses = [
+        { email: 'carol@banana.com', domain: 'banana.com', status: 'active' },
+        { email: 'alice@apple.com', domain: 'apple.com', status: 'active' },
+      ];
+      renderSidebar(addresses);
+      await user.click(screen.getByRole('button', { name: /alice@apple.com/i }));
+      const items = screen.getAllByRole('menuitem');
+      expect(items[0]).toHaveTextContent('alice@apple.com');
+      expect(items[1]).toHaveTextContent('carol@banana.com');
+    });
+
+    test('sorts addresses by local part within the same domain', async () => {
+      const user = userEvent.setup();
+      const addresses = [
+        { email: 'bob@apple.com', domain: 'apple.com', status: 'active' },
+        { email: 'alice@apple.com', domain: 'apple.com', status: 'active' },
+      ];
+      renderSidebar(addresses);
+      await user.click(screen.getByRole('button', { name: /alice@apple.com/i }));
+      const items = screen.getAllByRole('menuitem');
+      expect(items[0]).toHaveTextContent('alice@apple.com');
+      expect(items[1]).toHaveTextContent('bob@apple.com');
+    });
+
+    test('cross-domain and cross-local sort combined', async () => {
+      const user = userEvent.setup();
+      const addresses = [
+        { email: 'carol@banana.com', domain: 'banana.com', status: 'active' },
+        { email: 'bob@apple.com', domain: 'apple.com', status: 'active' },
+        { email: 'alice@apple.com', domain: 'apple.com', status: 'active' },
+      ];
+      renderSidebar(addresses);
+      await user.click(screen.getByRole('button', { name: /alice@apple.com/i }));
+      const items = screen.getAllByRole('menuitem');
+      expect(items[0]).toHaveTextContent('alice@apple.com');
+      expect(items[1]).toHaveTextContent('bob@apple.com');
+      expect(items[2]).toHaveTextContent('carol@banana.com');
+    });
+  });
+
+  describe('address dropdown unread badges', () => {
+    test('shows unread badge for address with unreadCount > 0', async () => {
+      const user = userEvent.setup();
+      renderSidebar(ADDRESSES);
+      await user.click(screen.getByRole('button', { name: /hello@example.com/i }));
+      const items = screen.getAllByRole('menuitem');
+      const helloItem = items.find((el) => el.textContent?.includes('hello@example.com'));
+      expect(helloItem).toHaveTextContent('3');
+    });
+
+    test('does not show unread badge for address with unreadCount 0', async () => {
+      const user = userEvent.setup();
+      renderSidebar(ADDRESSES);
+      await user.click(screen.getByRole('button', { name: /hello@example.com/i }));
+      const items = screen.getAllByRole('menuitem');
+      const infoItem = items.find((el) => el.textContent?.includes('info@example.com'));
+      expect(infoItem).not.toHaveTextContent(/^\d+$/);
+    });
+
+    test('does not show unread badge for address with absent unreadCount', async () => {
+      const user = userEvent.setup();
+      const addresses = [
+        { email: 'hello@example.com', domain: 'example.com', status: 'active' },
+      ];
+      renderSidebar(addresses);
+      await user.click(screen.getByRole('button', { name: /hello@example.com/i }));
+      const items = screen.getAllByRole('menuitem');
+      expect(items[0]).not.toHaveTextContent(/^\d+$/);
+    });
+
+    test('updates dropdown badge when hermes:inboxcount fires for a non-selected address', async () => {
+      mockPathname.mockReturnValue('/inbox/hello%40example.com');
+      const user = userEvent.setup();
+      renderSidebar(ADDRESSES);
+
+      act(() => {
+        window.dispatchEvent(
+          new CustomEvent('hermes:inboxcount', { detail: { address: 'info@example.com', unreadCount: 5 } }),
+        );
+      });
+
+      await user.click(screen.getByRole('button', { name: /hello@example.com/i }));
+      const items = screen.getAllByRole('menuitem');
+      const infoItem = items.find((el) => el.textContent?.includes('info@example.com'));
+      expect(infoItem).toHaveTextContent('5');
+    });
+  });
+
   test('calls sign out on button click', async () => {
     (global.fetch as jest.Mock).mockResolvedValue({ ok: true });
     const user = userEvent.setup();

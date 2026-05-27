@@ -72,7 +72,13 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
   const router = useRouter();
   const { subscribe } = useWs();
 
-  const activeAddresses = addresses.filter((a) => a.status !== "deleted");
+  const activeAddresses = addresses
+    .filter((a) => a.status !== "deleted")
+    .sort((a, b) => {
+      const domainCmp = a.domain.localeCompare(b.domain);
+      if (domainCmp !== 0) return domainCmp;
+      return a.email.localeCompare(b.email);
+    });
 
   const urlAddress = extractSelectedAddress(pathname);
   const selectedAddress =
@@ -227,7 +233,12 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
                         ? <Loader2 className="h-4 w-4 animate-spin shrink-0" />
                         : <Mail className="h-4 w-4 shrink-0 opacity-0" />
                       }
-                      {addr.email}
+                      <span className="flex-1 truncate">{addr.email}</span>
+                      {(unreadCounts.get(addr.email) ?? 0) > 0 && (
+                        <span className="ml-auto shrink-0 rounded-full bg-sidebar-primary px-1.5 py-0.5 text-xs font-medium text-sidebar-primary-foreground">
+                          {unreadCounts.get(addr.email)}
+                        </span>
+                      )}
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>
