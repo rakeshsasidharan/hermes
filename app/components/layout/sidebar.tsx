@@ -20,6 +20,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useWs } from "@/components/ws-context";
@@ -27,13 +28,18 @@ import {
   Inbox,
   Send,
   BookMarked,
-  AlertCircle,
+  ArchiveX,
   Trash2,
   PenSquare,
   LogOut,
   ChevronDown,
+  ChevronUp,
   Mail,
   Loader2,
+  Globe,
+  AtSign,
+  Settings,
+  SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isGuardActive, tryNavigate } from "@/lib/navigation-guard";
@@ -49,6 +55,12 @@ interface AppSidebarProps {
   addresses: Address[];
 }
 
+const PROFILE_NAV = [
+  { key: 'domains', label: 'Domains', icon: Globe, href: '/domains' },
+  { key: 'addresses', label: 'Addresses', icon: AtSign, href: '/addresses' },
+  { key: 'settings', label: 'Settings', icon: Settings, href: '/settings' },
+] as const;
+
 function extractSelectedAddress(pathname: string): string | null {
   const match = pathname.match(/^\/(inbox|sent|drafts|junk|trash)\/([^/]+)/);
   return match ? decodeURIComponent(match[2]) : null;
@@ -63,7 +75,7 @@ const FOLDERS = [
   { key: "inbox", label: "Inbox", icon: Inbox, href: (addr: string) => `/inbox/${encodeURIComponent(addr)}` },
   { key: "drafts", label: "Drafts", icon: BookMarked, href: (addr: string) => `/drafts/${encodeURIComponent(addr)}` },
   { key: "sent", label: "Sent", icon: Send, href: (addr: string) => `/sent/${encodeURIComponent(addr)}` },
-  { key: "junk", label: "Junk", icon: AlertCircle, href: (addr: string) => `/junk/${encodeURIComponent(addr)}` },
+  { key: "junk", label: "Junk", icon: ArchiveX, href: (addr: string) => `/junk/${encodeURIComponent(addr)}` },
   { key: "trash", label: "Trash", icon: Trash2, href: (addr: string) => `/trash/${encodeURIComponent(addr)}` },
 ];
 
@@ -322,10 +334,44 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Sign out" onClick={handleSignOut} disabled={isSigningOut} aria-busy={isSigningOut}>
-              {isSigningOut ? <Loader2 className="animate-spin" /> : <LogOut />}
-              <span>Sign out</span>
-            </SidebarMenuButton>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton
+                  tooltip="Options"
+                  data-testid="profile-trigger"
+                >
+                  <SlidersHorizontal className="shrink-0" />
+                  <span className="group-data-[collapsible=icon]:hidden">Options</span>
+                  <ChevronUp className="ml-auto shrink-0 h-4 w-4 group-data-[collapsible=icon]:hidden" />
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" align="start" className="w-56">
+                {PROFILE_NAV.map(({ key, label, icon: Icon, href }) => {
+                  const isActive = pathname === href || pathname.startsWith(`${href}/`);
+                  return (
+                    <DropdownMenuItem
+                      key={key}
+                      asChild
+                      className={cn(isActive && 'font-medium bg-accent')}
+                    >
+                      <Link href={href} data-testid={`profile-nav-${key}`}>
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span>{label}</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  );
+                })}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={handleSignOut}
+                  disabled={isSigningOut}
+                  data-testid="profile-nav-signout"
+                >
+                  {isSigningOut ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <LogOut className="h-4 w-4 shrink-0" />}
+                  <span>Sign out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

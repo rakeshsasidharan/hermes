@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AddressList } from '@/components/addresses/address-list';
 
 async function fetchAddresses(cookieHeader: string) {
@@ -28,9 +29,15 @@ export default async function AddressesPage() {
     .filter((d: { status: string }) => d.status === 'Verified')
     .map((d: { domain: string }) => d.domain);
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Addresses</h1>
-      <AddressList addresses={addresses} domains={verifiedDomains} />
+    <div className="max-w-3xl w-full">
+      <Card>
+        <CardHeader>
+          <CardTitle>Addresses</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <AddressList addresses={addresses} domains={verifiedDomains} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

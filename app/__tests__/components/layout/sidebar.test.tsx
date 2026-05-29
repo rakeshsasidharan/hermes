@@ -382,16 +382,51 @@ describe('AppSidebar', () => {
     });
   });
 
-  test('calls sign out on button click', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({ ok: true });
-    const user = userEvent.setup();
-    renderSidebar();
+  describe('options dropdown', () => {
+    test('shows Options trigger button', () => {
+      renderSidebar();
+      const trigger = screen.getByTestId('profile-trigger');
+      expect(trigger).toBeInTheDocument();
+      expect(trigger).toHaveTextContent('Options');
+    });
 
-    await user.click(screen.getByRole('button', { name: /sign out/i }));
+    test('dropdown contains navigation links and sign out', async () => {
+      const user = userEvent.setup();
+      renderSidebar();
+      await user.click(screen.getByTestId('profile-trigger'));
+      expect(screen.getByTestId('profile-nav-domains')).toBeInTheDocument();
+      expect(screen.getByTestId('profile-nav-addresses')).toBeInTheDocument();
+      expect(screen.getByTestId('profile-nav-settings')).toBeInTheDocument();
+      expect(screen.getByTestId('profile-nav-signout')).toBeInTheDocument();
+    });
 
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/auth/signout', { method: 'POST' });
-      expect(mockPush).toHaveBeenCalledWith('/login');
+    test('nav links point to correct hrefs', async () => {
+      const user = userEvent.setup();
+      renderSidebar();
+      await user.click(screen.getByTestId('profile-trigger'));
+      expect(screen.getByTestId('profile-nav-domains')).toHaveAttribute('href', '/domains');
+      expect(screen.getByTestId('profile-nav-addresses')).toHaveAttribute('href', '/addresses');
+      expect(screen.getByTestId('profile-nav-settings')).toHaveAttribute('href', '/settings');
+    });
+
+    test('active page item is highlighted', async () => {
+      mockPathname.mockReturnValue('/addresses');
+      const user = userEvent.setup();
+      renderSidebar();
+      await user.click(screen.getByTestId('profile-trigger'));
+      expect(screen.getByTestId('profile-nav-addresses')).toHaveClass('bg-accent');
+    });
+
+    test('calls sign out when Sign out is selected', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: true });
+      const user = userEvent.setup();
+      renderSidebar();
+      await user.click(screen.getByTestId('profile-trigger'));
+      await user.click(screen.getByTestId('profile-nav-signout'));
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith('/api/auth/signout', { method: 'POST' });
+        expect(mockPush).toHaveBeenCalledWith('/login');
+      });
     });
   });
 });
