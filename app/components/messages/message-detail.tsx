@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
-  AlertTriangle,
+  ArchiveX,
   Trash2,
   Reply,
   ReplyAll,
@@ -240,7 +240,7 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
                     disabled={isMovingToJunk}
                     aria-label="Move to Junk"
                   >
-                    {isMovingToJunk ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertTriangle className="h-4 w-4" />}
+                    {isMovingToJunk ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArchiveX className="h-4 w-4" />}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Move to Junk</TooltipContent>

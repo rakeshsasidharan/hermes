@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DomainList } from '@/components/domains/domain-list';
 
 interface Domain {
@@ -19,9 +20,15 @@ export default async function DomainsPage() {
   const cookieHeader = cookieStore.toString();
   const domains = await fetchDomains(cookieHeader);
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Domains</h1>
-      <DomainList domains={domains} />
+    <div className="max-w-3xl w-full">
+      <Card>
+        <CardHeader>
+          <CardTitle>Domains</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DomainList domains={domains} />
+        </CardContent>
+      </Card>
     </div>
   );
 }
