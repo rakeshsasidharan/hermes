@@ -1,13 +1,7 @@
 import { cookies } from 'next/headers';
-import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Globe, AtSign, Mail, Clock } from 'lucide-react';
+import { redirect } from 'next/navigation';
 
-interface Domain {
-  domain: string;
-  status: 'Verified' | 'Pending' | 'Failed';
-}
+const BASE = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
 interface Address {
   email: string;
@@ -15,215 +9,28 @@ interface Address {
   status: string;
 }
 
-interface Message {
-  messageId: string;
-  address: string;
-  sender: string;
-  subject: string;
-  receivedAt: string;
-  isRead: boolean;
-}
+export default async function DefaultPage() {
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
 
-const BASE = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
-
-async function fetchDomains(cookieHeader: string): Promise<Domain[]> {
-  const res = await fetch(`${BASE}/api/domains`, {
-    headers: { Cookie: cookieHeader },
-    cache: 'no-store',
-  });
-  return res.ok ? ((await res.json()).domains ?? []) : [];
-}
-
-async function fetchAddresses(cookieHeader: string): Promise<Address[]> {
   const res = await fetch(`${BASE}/api/addresses`, {
     headers: { Cookie: cookieHeader },
     cache: 'no-store',
   });
-  return res.ok ? ((await res.json()).addresses ?? []) : [];
-}
 
-async function fetchRecentMessages(
-  cookieHeader: string,
-  addresses: Address[],
-): Promise<Message[]> {
-  if (addresses.length === 0) return [];
-
-  const perAddress = await Promise.all(
-    addresses.map(async (addr) => {
-      const url = `${BASE}/api/messages?address=${encodeURIComponent(addr.email)}&direction=inbound&limit=5`;
-      const res = await fetch(url, {
-        headers: { Cookie: cookieHeader },
-        cache: 'no-store',
+  if (res.ok) {
+    const { addresses = [] }: { addresses: Address[] } = await res.json();
+    const active = addresses
+      .filter((a) => a.status !== 'deleted')
+      .sort((a, b) => {
+        const dc = a.domain.localeCompare(b.domain);
+        return dc !== 0 ? dc : a.email.localeCompare(b.email);
       });
-      return res.ok ? ((await res.json()).messages ?? []) : [];
-    }),
-  );
 
-  return perAddress
-    .flat()
-    .sort(
-      (a: Message, b: Message) =>
-        new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime(),
-    )
-    .slice(0, 5);
-}
+    if (active.length > 0) {
+      redirect(`/inbox/${encodeURIComponent(active[0].email)}`);
+    }
+  }
 
-async function fetchMessageCounts(
-  cookieHeader: string,
-  addresses: Address[],
-): Promise<{ total: number; unread: number }> {
-  if (addresses.length === 0) return { total: 0, unread: 0 };
-
-  const perAddress = await Promise.all(
-    addresses.map(async (addr) => {
-      const url = `${BASE}/api/messages/count?address=${encodeURIComponent(addr.email)}`;
-      const res = await fetch(url, {
-        headers: { Cookie: cookieHeader },
-        cache: 'no-store',
-      });
-      return res.ok ? ((await res.json()) as { total: number; unread: number }) : { total: 0, unread: 0 };
-    }),
-  );
-
-  return perAddress.reduce(
-    (acc, cur) => ({ total: acc.total + cur.total, unread: acc.unread + cur.unread }),
-    { total: 0, unread: 0 },
-  );
-}
-
-function formatRelativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
-
-export default async function DashboardPage() {
-  const cookieStore = await cookies();
-  const cookieHeader = cookieStore.toString();
-
-  const [domains, addresses] = await Promise.all([
-    fetchDomains(cookieHeader),
-    fetchAddresses(cookieHeader),
-  ]);
-
-  const [recentMessages, messageCounts] = await Promise.all([
-    fetchRecentMessages(cookieHeader, addresses),
-    fetchMessageCounts(cookieHeader, addresses),
-  ]);
-
-  const verified = domains.filter((d) => d.status === 'Verified').length;
-  const pending = domains.filter((d) => d.status === 'Pending').length;
-  const failed = domains.filter((d) => d.status === 'Failed').length;
-
-  const { total: totalMessages, unread: unreadMessages } = messageCounts;
-
-  return (
-    <div className=" space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground text-sm">Overview of your Hermes account</p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Domains</CardTitle>
-            <Globe className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{domains.length}</p>
-            <div className="mt-1 flex gap-2 flex-wrap">
-              <Badge variant="default" className="text-xs">
-                {verified} Verified
-              </Badge>
-              <Badge variant="secondary" className="text-xs">
-                {pending} Pending
-              </Badge>
-              {failed > 0 && (
-                <Badge variant="destructive" className="text-xs">
-                  {failed} Failed
-                </Badge>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Addresses</CardTitle>
-            <AtSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{addresses.length}</p>
-            <p className="text-xs text-muted-foreground mt-1">Active addresses</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Messages</CardTitle>
-            <Mail className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{totalMessages}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {unreadMessages} unread
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Recent Activity</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {recentMessages.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">No messages yet</p>
-          ) : (
-            <ul className="space-y-3">
-              {recentMessages.map((msg) => (
-                <li key={msg.messageId}>
-                  <Link
-                    href={`/inbox/${encodeURIComponent(msg.address)}/${msg.messageId}`}
-                    className="flex items-start gap-3 rounded-md p-2 hover:bg-accent transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`text-sm truncate ${!msg.isRead ? 'font-semibold' : 'font-normal'}`}
-                        >
-                          {msg.subject || '(no subject)'}
-                        </span>
-                        {!msg.isRead && (
-                          <span className="h-2 w-2 rounded-full bg-primary shrink-0" />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <span className="text-xs text-muted-foreground truncate">
-                          {msg.sender}
-                        </span>
-                        <span className="text-xs text-muted-foreground">→</span>
-                        <span className="text-xs text-muted-foreground truncate">
-                          {msg.address}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0 text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      {formatRelativeTime(msg.receivedAt)}
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
+  redirect('/settings');
 }

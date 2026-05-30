@@ -390,31 +390,27 @@ describe('AppSidebar', () => {
       expect(trigger).toHaveTextContent('Options');
     });
 
-    test('dropdown contains navigation links and sign out', async () => {
+    test('dropdown contains Settings link and sign out', async () => {
       const user = userEvent.setup();
       renderSidebar();
       await user.click(screen.getByTestId('profile-trigger'));
-      expect(screen.getByTestId('profile-nav-domains')).toBeInTheDocument();
-      expect(screen.getByTestId('profile-nav-addresses')).toBeInTheDocument();
       expect(screen.getByTestId('profile-nav-settings')).toBeInTheDocument();
       expect(screen.getByTestId('profile-nav-signout')).toBeInTheDocument();
     });
 
-    test('nav links point to correct hrefs', async () => {
+    test('Settings nav link points to /settings', async () => {
       const user = userEvent.setup();
       renderSidebar();
       await user.click(screen.getByTestId('profile-trigger'));
-      expect(screen.getByTestId('profile-nav-domains')).toHaveAttribute('href', '/domains');
-      expect(screen.getByTestId('profile-nav-addresses')).toHaveAttribute('href', '/addresses');
       expect(screen.getByTestId('profile-nav-settings')).toHaveAttribute('href', '/settings');
     });
 
     test('active page item is highlighted', async () => {
-      mockPathname.mockReturnValue('/addresses');
+      mockPathname.mockReturnValue('/settings');
       const user = userEvent.setup();
       renderSidebar();
       await user.click(screen.getByTestId('profile-trigger'));
-      expect(screen.getByTestId('profile-nav-addresses')).toHaveClass('bg-accent');
+      expect(screen.getByTestId('profile-nav-settings')).toHaveClass('bg-accent');
     });
 
     test('calls sign out when Sign out is selected', async () => {

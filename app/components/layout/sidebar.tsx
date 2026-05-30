@@ -36,8 +36,6 @@ import {
   ChevronUp,
   Mail,
   Loader2,
-  Globe,
-  AtSign,
   Settings,
   SlidersHorizontal,
 } from "lucide-react";
@@ -56,8 +54,6 @@ interface AppSidebarProps {
 }
 
 const PROFILE_NAV = [
-  { key: 'domains', label: 'Domains', icon: Globe, href: '/domains' },
-  { key: 'addresses', label: 'Addresses', icon: AtSign, href: '/addresses' },
   { key: 'settings', label: 'Settings', icon: Settings, href: '/settings' },
 ] as const;
 

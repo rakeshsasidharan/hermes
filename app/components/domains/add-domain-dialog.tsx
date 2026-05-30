@@ -22,9 +22,11 @@ interface DomainStatus {
 
 interface AddDomainDialogProps {
   onSuccess: () => void;
+  trigger?: React.ReactNode;
+  initialDomain?: string;
 }
 
-export function AddDomainDialog({ onSuccess }: AddDomainDialogProps) {
+export function AddDomainDialog({ onSuccess, trigger, initialDomain }: AddDomainDialogProps) {
   const [open, setOpen] = useState(false);
   const [domain, setDomain] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +34,14 @@ export function AddDomainDialog({ onSuccess }: AddDomainDialogProps) {
   const [pollingDomain, setPollingDomain] = useState<string | null>(null);
   const [status, setStatus] = useState<DomainStatus | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // When an initialDomain is provided and the dialog opens, jump straight to polling
+  useEffect(() => {
+    if (open && initialDomain && !pollingDomain) {
+      setPollingDomain(initialDomain);
+      setStatus({ ses: 'Pending', dkim: 'Pending' });
+    }
+  }, [open, initialDomain, pollingDomain]);
 
   useEffect(() => {
     if (!pollingDomain) return;
@@ -101,11 +111,11 @@ export function AddDomainDialog({ onSuccess }: AddDomainDialogProps) {
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogTrigger asChild>
-        <Button>Add domain</Button>
+        {trigger ?? <Button>Add domain</Button>}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add domain</DialogTitle>
+          <DialogTitle>{initialDomain ? `Verify ${initialDomain}` : 'Add domain'}</DialogTitle>
         </DialogHeader>
 
         {!pollingDomain ? (

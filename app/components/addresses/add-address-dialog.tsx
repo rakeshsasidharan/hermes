@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -31,12 +30,14 @@ interface NewAddress {
 interface AddAddressDialogProps {
   domains: string[];
   onSuccess: (address: NewAddress) => void;
+  defaultDomain?: string;
+  trigger?: React.ReactNode;
 }
 
-export function AddAddressDialog({ domains, onSuccess }: AddAddressDialogProps) {
+export function AddAddressDialog({ domains, onSuccess, defaultDomain, trigger }: AddAddressDialogProps) {
   const [open, setOpen] = useState(false);
   const [localPart, setLocalPart] = useState('');
-  const [domain, setDomain] = useState('');
+  const [domain, setDomain] = useState(defaultDomain ?? '');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -58,7 +59,7 @@ export function AddAddressDialog({ domains, onSuccess }: AddAddressDialogProps) 
       if (res.ok) {
         const data = await res.json();
         setLocalPart('');
-        setDomain('');
+        setDomain(defaultDomain ?? '');
         setOpen(false);
         onSuccess(data.address);
       } else {
@@ -71,9 +72,9 @@ export function AddAddressDialog({ domains, onSuccess }: AddAddressDialogProps) 
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setError(null); }}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setError(null); setDomain(defaultDomain ?? ''); } }}>
       <DialogTrigger asChild>
-        <Button>Add address</Button>
+        {trigger ?? <Button variant="outline">+ Add Address</Button>}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -82,10 +83,7 @@ export function AddAddressDialog({ domains, onSuccess }: AddAddressDialogProps) 
         {domains.length === 0 && (
           <Alert>
             <AlertDescription>
-              Domain not verified —{' '}
-              <Link href="/domains" className="font-medium underline underline-offset-4">
-                Set up domain →
-              </Link>
+              No verified domains yet — add and verify a domain first.
             </AlertDescription>
           </Alert>
         )}
@@ -107,7 +105,7 @@ export function AddAddressDialog({ domains, onSuccess }: AddAddressDialogProps) 
           </div>
           <div className="space-y-2">
             <Label htmlFor="domain-select">Domain</Label>
-            <Select value={domain} onValueChange={setDomain}>
+            <Select value={domain} onValueChange={setDomain} disabled={!!defaultDomain}>
               <SelectTrigger id="domain-select">
                 <SelectValue placeholder="Select domain" />
               </SelectTrigger>

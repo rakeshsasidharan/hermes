@@ -6,7 +6,6 @@ jest.mock('next/navigation', () => ({
   useRouter: jest.fn().mockReturnValue({ refresh: jest.fn() }),
 }));
 
-// Mock heavy Radix UI components that don't work well in jsdom
 jest.mock('@/components/ui/dialog', () => ({
   Dialog: ({ children }: { children: React.ReactNode }) =>
     <div data-testid="dialog">{children}</div>,
@@ -19,10 +18,11 @@ jest.mock('@/components/ui/dialog', () => ({
 }));
 
 jest.mock('@/components/ui/select', () => ({
-  Select: ({ children, onValueChange, value }: {
+  Select: ({ children, onValueChange, value, disabled }: {
     children: React.ReactNode;
     onValueChange?: (v: string) => void;
     value?: string;
+    disabled?: boolean;
   }) => (
     <div>
       <select
@@ -30,6 +30,7 @@ jest.mock('@/components/ui/select', () => ({
         value={value}
         onChange={(e) => onValueChange?.(e.target.value)}
         aria-label="Domain"
+        disabled={disabled}
       >
         {children}
       </select>
@@ -58,6 +59,17 @@ describe('AddAddressDialog', () => {
     expect(screen.getByRole('button', { name: /add address/i })).toBeInTheDocument();
   });
 
+  test('renders custom trigger when provided', () => {
+    render(
+      <AddAddressDialog
+        domains={DOMAINS}
+        onSuccess={jest.fn()}
+        trigger={<button>Custom trigger</button>}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /custom trigger/i })).toBeInTheDocument();
+  });
+
   test('shows local part input and domain select', () => {
     render(<AddAddressDialog domains={DOMAINS} onSuccess={jest.fn()} />);
     expect(screen.getByLabelText(/local part/i)).toBeInTheDocument();
@@ -69,6 +81,17 @@ describe('AddAddressDialog', () => {
     const select = screen.getByTestId('domain-select');
     expect(select).toContainHTML('example.com');
     expect(select).toContainHTML('test.io');
+  });
+
+  test('pre-selects defaultDomain when provided', () => {
+    render(<AddAddressDialog domains={DOMAINS} onSuccess={jest.fn()} defaultDomain="test.io" />);
+    const select = screen.getByTestId('domain-select') as HTMLSelectElement;
+    expect(select.value).toBe('test.io');
+  });
+
+  test('disables domain select when defaultDomain is provided', () => {
+    render(<AddAddressDialog domains={DOMAINS} onSuccess={jest.fn()} defaultDomain="test.io" />);
+    expect(screen.getByTestId('domain-select')).toBeDisabled();
   });
 
   test('calls POST /api/addresses with correct email on submit', async () => {
@@ -118,5 +141,11 @@ describe('AddAddressDialog', () => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
       expect(screen.getByText('Domain not verified')).toBeInTheDocument();
     });
+  });
+
+  test('shows no-domains alert when domains list is empty', () => {
+    render(<AddAddressDialog domains={[]} onSuccess={jest.fn()} />);
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByText(/no verified domains yet/i)).toBeInTheDocument();
   });
 });
