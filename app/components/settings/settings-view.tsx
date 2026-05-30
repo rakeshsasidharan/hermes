@@ -171,7 +171,7 @@ export function SettingsView({
       </div>
 
       {/* Domain Accordions */}
-      <div className="space-y-2">
+      <div className="space-y-6">
         {domains.length === 0 ? (
           <Card>
             <CardContent className="p-8 text-center text-sm text-muted-foreground">
