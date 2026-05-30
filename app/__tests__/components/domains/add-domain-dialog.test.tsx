@@ -12,8 +12,8 @@ afterEach(() => {
   jest.clearAllMocks();
 });
 
-function renderDialog(onSuccess = jest.fn()) {
-  return render(<AddDomainDialog onSuccess={onSuccess} />);
+function renderDialog(onSuccess = jest.fn(), props: Partial<React.ComponentProps<typeof AddDomainDialog>> = {}) {
+  return render(<AddDomainDialog onSuccess={onSuccess} {...props} />);
 }
 
 async function openDialog(user: ReturnType<typeof userEvent.setup>) {
@@ -77,6 +77,31 @@ describe('AddDomainDialog', () => {
       await user.click(screen.getByRole('button', { name: /set up domain/i }));
 
       expect(screen.getByText(/domain name is required/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('custom trigger', () => {
+    test('renders custom trigger when provided', async () => {
+      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      renderDialog(jest.fn(), { trigger: <button>Custom</button> });
+      expect(screen.getByRole('button', { name: /custom/i })).toBeInTheDocument();
+    });
+  });
+
+  describe('initialDomain (Verify Now flow)', () => {
+    test('jumps straight to polling state when initialDomain is provided and dialog opens', async () => {
+      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ ses: 'Pending', dkim: 'Pending' }),
+      });
+      renderDialog(jest.fn(), { initialDomain: 'pending.com' });
+      await user.click(screen.getByRole('button', { name: /add domain/i }));
+      await waitFor(() => {
+        expect(screen.getByText(/verifying/i)).toBeInTheDocument();
+        expect(screen.getByText('pending.com')).toBeInTheDocument();
+      });
+      expect(screen.queryByPlaceholderText(/example\.com/i)).not.toBeInTheDocument();
     });
   });
 

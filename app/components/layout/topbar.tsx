@@ -8,8 +8,6 @@ function getTitle(pathname: string): string {
   if (pathname === '/drafts') return 'Drafts';
   if (pathname === '/settings') return 'Settings';
   if (pathname === '/compose') return 'Compose';
-  if (pathname === '/addresses') return 'Addresses';
-  if (pathname === '/domains') return 'Domains';
 
   const mailboxMatch = pathname.match(/^\/(inbox|sent)\/([^/]+)(?:\/[^/]+)?$/);
   if (mailboxMatch) {
