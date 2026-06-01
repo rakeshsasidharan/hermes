@@ -1,0 +1,11 @@
+{
+  "name": "cleanup-expired-messages",
+  "version": "1.0.0",
+  "description": "Hermes cleanup Lambda — moves expired junk to trash and deletes expired trash",
+  "main": "index.js",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.0.0",
+    "@aws-sdk/client-s3": "^3.0.0",
+    "@aws-sdk/lib-dynamodb": "^3.0.0"
+  }
+}

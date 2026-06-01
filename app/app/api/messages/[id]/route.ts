@@ -134,9 +134,14 @@ export async function PATCH(
   }
 
   if (hasFolder) {
+    const currentFolder = existing.Item?.folder;
     setClauses.push('#folder = :folder');
     expressionAttributeNames['#folder'] = 'folder';
     expressionAttributeValues[':folder'] = folder;
+    if (folder !== currentFolder) {
+      setClauses.push('folderMovedAt = :folderMovedAt');
+      expressionAttributeValues[':folderMovedAt'] = new Date().toISOString();
+    }
   }
 
   const result = await dynamo.send(new UpdateCommand({
