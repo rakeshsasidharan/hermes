@@ -154,6 +154,35 @@ describe('HermesEmailStack', () => {
     });
   });
 
+  describe('CleanupExpiredMessages Lambda', () => {
+    test('creates CleanupExpiredMessages with Node.js 22.x runtime', () => {
+      template.hasResourceProperties('AWS::Lambda::Function', {
+        FunctionName: 'hermes-cleanup-expired-messages',
+        Runtime: 'nodejs22.x',
+        Handler: 'index.handler',
+      });
+    });
+
+    test('CleanupExpiredMessages has required environment variables', () => {
+      template.hasResourceProperties('AWS::Lambda::Function', {
+        FunctionName: 'hermes-cleanup-expired-messages',
+        Environment: {
+          Variables: Match.objectLike({
+            MESSAGES_TABLE: 'hermes-messages',
+            S3_BUCKET: 'hermes-email-store',
+          }),
+        },
+      });
+    });
+
+    test('daily EventBridge rule triggers CleanupExpiredMessages at 03:00 UTC', () => {
+      template.hasResourceProperties('AWS::Events::Rule', {
+        Name: 'hermes-cleanup-expired-messages-rule',
+        ScheduleExpression: 'cron(0 3 * * ? *)',
+      });
+    });
+  });
+
   describe('CloudWatch Log Groups', () => {
     test('all log groups have DeletionPolicy Delete', () => {
       const resources = template.toJSON().Resources;
@@ -167,6 +196,12 @@ describe('HermesEmailStack', () => {
     test('creates explicit log group for hermes-inbound-email-processor', () => {
       template.hasResourceProperties('AWS::Logs::LogGroup', {
         LogGroupName: '/aws/lambda/hermes-inbound-email-processor',
+      });
+    });
+
+    test('creates explicit log group for hermes-cleanup-expired-messages', () => {
+      template.hasResourceProperties('AWS::Logs::LogGroup', {
+        LogGroupName: '/aws/lambda/hermes-cleanup-expired-messages',
       });
     });
   });

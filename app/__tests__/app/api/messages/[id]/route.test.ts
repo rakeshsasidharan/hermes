@@ -402,4 +402,44 @@ describe('PATCH /api/messages/:id', () => {
 
     expect(mockDynamoSend).not.toHaveBeenCalled();
   });
+
+  test('writes folderMovedAt when folder changes', async () => {
+    mockDynamoSend.mockResolvedValueOnce({ Item: { ...EXISTING_ITEM, folder: 'inbox' } });
+    mockDynamoSend.mockResolvedValueOnce({ Attributes: { ...EXISTING_ITEM, folder: 'junk' } });
+
+    await PATCH(makePatchReq('msg-1', { folder: 'junk' }), makeParams('msg-1'));
+
+    const updateCall = (mockDynamoSend.mock.calls as Array<[Record<string, unknown>]>).find(
+      ([cmd]) => 'UpdateExpression' in cmd,
+    )?.[0];
+    const values = updateCall?.ExpressionAttributeValues as Record<string, unknown>;
+    expect(values[':folderMovedAt']).toBeDefined();
+    expect(typeof values[':folderMovedAt']).toBe('string');
+  });
+
+  test('does not write folderMovedAt when only isRead changes', async () => {
+    mockDynamoSend.mockResolvedValueOnce({ Item: EXISTING_ITEM });
+    mockDynamoSend.mockResolvedValueOnce({ Attributes: { ...EXISTING_ITEM, isRead: true } });
+
+    await PATCH(makePatchReq('msg-1', { isRead: true }), makeParams('msg-1'));
+
+    const updateCall = (mockDynamoSend.mock.calls as Array<[Record<string, unknown>]>).find(
+      ([cmd]) => 'UpdateExpression' in cmd,
+    )?.[0];
+    const values = updateCall?.ExpressionAttributeValues as Record<string, unknown>;
+    expect(values[':folderMovedAt']).toBeUndefined();
+  });
+
+  test('does not write folderMovedAt when folder is set to the same value', async () => {
+    mockDynamoSend.mockResolvedValueOnce({ Item: { ...EXISTING_ITEM, folder: 'junk' } });
+    mockDynamoSend.mockResolvedValueOnce({ Attributes: { ...EXISTING_ITEM, folder: 'junk' } });
+
+    await PATCH(makePatchReq('msg-1', { folder: 'junk' }), makeParams('msg-1'));
+
+    const updateCall = (mockDynamoSend.mock.calls as Array<[Record<string, unknown>]>).find(
+      ([cmd]) => 'UpdateExpression' in cmd,
+    )?.[0];
+    const values = updateCall?.ExpressionAttributeValues as Record<string, unknown>;
+    expect(values[':folderMovedAt']).toBeUndefined();
+  });
 });

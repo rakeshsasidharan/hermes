@@ -27,6 +27,7 @@ export class HermesEmailStack extends cdk.Stack {
   public readonly receiptRuleSet: ses.CfnReceiptRuleSet;
   public readonly sesS3DeliveryRole: iam.Role;
   public readonly inboundEmailProcessor: lambda.Function;
+  public readonly cleanupExpiredMessages: lambda.Function;
 
   constructor(scope: Construct, id: string, props: HermesEmailStackProps) {
     super(scope, id, props);
@@ -141,6 +142,59 @@ export class HermesEmailStack extends cdk.Stack {
         },
       },
       targets: [new eventTargets.LambdaFunction(this.inboundEmailProcessor)],
+    });
+
+    const cleanupLogGroup = new logs.LogGroup(this, 'CleanupExpiredMessagesLogGroup', {
+      logGroupName: '/aws/lambda/hermes-cleanup-expired-messages',
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const cleanupLambdaDir = path.join(__dirname, '../lambda/cleanup-expired-messages');
+    this.cleanupExpiredMessages = new lambda.Function(this, 'CleanupExpiredMessages', {
+      functionName: 'hermes-cleanup-expired-messages',
+      runtime: lambda.Runtime.NODEJS_22_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset(cleanupLambdaDir, {
+        bundling: {
+          local: {
+            tryBundle(outputDir: string): boolean {
+              try {
+                execSync(
+                  `cp "${cleanupLambdaDir}/index.js" "${cleanupLambdaDir}/package.json" "${cleanupLambdaDir}/package-lock.json" "${outputDir}/"`,
+                  { stdio: 'pipe' },
+                );
+                execSync('npm ci --production', { cwd: outputDir, stdio: 'pipe' });
+                return true;
+              } catch {
+                return false;
+              }
+            },
+          },
+          image: lambda.Runtime.NODEJS_22_X.bundlingImage,
+          command: [
+            'bash',
+            '-c',
+            'cp /asset-input/index.js /asset-input/package.json /asset-input/package-lock.json /asset-output/ && cd /asset-output && npm ci --production',
+          ],
+        },
+      }),
+      logGroup: cleanupLogGroup,
+      timeout: cdk.Duration.minutes(5),
+      environment: {
+        MESSAGES_TABLE: props.messagesTable.tableName,
+        S3_BUCKET: props.emailBucket.bucketName,
+      },
+    });
+    cdk.Tags.of(this.cleanupExpiredMessages).add(HERMES_TAG.key, HERMES_TAG.value);
+
+    props.messagesTable.grantReadWriteData(this.cleanupExpiredMessages);
+    props.emailBucket.grantDelete(this.cleanupExpiredMessages);
+
+    new events.Rule(this, 'CleanupExpiredMessagesRule', {
+      ruleName: 'hermes-cleanup-expired-messages-rule',
+      description: 'Triggers CleanupExpiredMessages daily to expire junk and trash messages',
+      schedule: events.Schedule.cron({ minute: '0', hour: '3' }),
+      targets: [new eventTargets.LambdaFunction(this.cleanupExpiredMessages)],
     });
   }
 }

@@ -35,6 +35,7 @@ jobs:
             infra/package-lock.json
             infra/lambda/inbound-email-processor/package-lock.json
             infra/lambda/ws-connect/package-lock.json
+            infra/lambda/cleanup-expired-messages/package-lock.json
 
       - name: Install app dependencies
         working-directory: app
@@ -54,6 +55,10 @@ jobs:
 
       - name: Install ws-connect dependencies
         working-directory: infra/lambda/ws-connect
+        run: npm ci
+
+      - name: Install cleanup-expired-messages dependencies
+        working-directory: infra/lambda/cleanup-expired-messages
         run: npm ci
 
       - name: Run infra tests
@@ -79,6 +84,7 @@ jobs:
             infra/package-lock.json
             infra/lambda/inbound-email-processor/package-lock.json
             infra/lambda/ws-connect/package-lock.json
+            infra/lambda/cleanup-expired-messages/package-lock.json
 
       - name: Configure AWS credentials (OIDC)
         id: aws-creds
@@ -98,6 +104,10 @@ jobs:
 
       - name: Install ws-connect dependencies
         working-directory: infra/lambda/ws-connect
+        run: npm ci
+
+      - name: Install cleanup-expired-messages dependencies
+        working-directory: infra/lambda/cleanup-expired-messages
         run: npm ci
 
       - name: CDK diff
@@ -155,6 +165,7 @@ jobs:
             infra/package-lock.json
             infra/lambda/inbound-email-processor/package-lock.json
             infra/lambda/ws-connect/package-lock.json
+            infra/lambda/cleanup-expired-messages/package-lock.json
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -172,6 +183,10 @@ jobs:
 
       - name: Install ws-connect dependencies
         working-directory: infra/lambda/ws-connect
+        run: npm ci
+
+      - name: Install cleanup-expired-messages dependencies
+        working-directory: infra/lambda/cleanup-expired-messages
         run: npm ci
 
       - name: Detect changed paths
