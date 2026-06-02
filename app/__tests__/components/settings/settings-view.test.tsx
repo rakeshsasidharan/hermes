@@ -1,3 +1,4 @@
+import React from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SettingsView } from '@/components/settings/settings-view';
@@ -53,6 +54,71 @@ jest.mock('@/components/addresses/delete-address-dialog', () => ({
   ),
 }));
 
+jest.mock('@/components/settings/change-password-dialog', () => ({
+  ChangePasswordDialog: ({ trigger }: { trigger: React.ReactNode }) => (
+    <div data-testid="change-password-dialog">{trigger}</div>
+  ),
+}));
+
+jest.mock('@/components/ui/select', () => {
+  const React = require('react');
+
+  const SelectItem = ({ value, children }: { value: string; children: React.ReactNode }) => (
+    <option value={value}>{children}</option>
+  );
+  const SelectContent = ({ children }: { children: React.ReactNode }) => <>{children}</>;
+  const SelectTrigger = (_props: unknown) => null;
+  const SelectValue = () => null;
+
+  const Select = ({ children, onValueChange, value }: {
+    children: React.ReactNode;
+    onValueChange?: (v: string) => void;
+    value?: string;
+  }) => {
+    let testId: string | undefined;
+    const items: React.ReactNode[] = [];
+
+    React.Children.forEach(children, (child: React.ReactElement) => {
+      if (!React.isValidElement(child)) return;
+      if ((child as React.ReactElement).type === SelectTrigger) {
+        testId = (child as React.ReactElement<{ 'data-testid'?: string }>).props['data-testid'];
+      }
+      if ((child as React.ReactElement).type === SelectContent) {
+        React.Children.forEach(
+          (child as React.ReactElement<{ children: React.ReactNode }>).props.children,
+          (item: React.ReactElement) => {
+            if (React.isValidElement(item) && item.type === SelectItem) {
+              items.push(item);
+            }
+          },
+        );
+      }
+    });
+
+    return (
+      <select
+        data-testid={testId}
+        value={value ?? ''}
+        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onValueChange?.(e.target.value)}
+      >
+        {items}
+      </select>
+    );
+  };
+
+  return { Select, SelectTrigger, SelectContent, SelectItem, SelectValue };
+});
+
+const mockSetPreferenceCookie = jest.fn();
+const mockGetPreferenceCookie = jest.fn().mockReturnValue(null);
+
+jest.mock('@/lib/preferences', () => ({
+  PREFERRED_ADDRESS_COOKIE: 'hermes_preferred_address',
+  SIDEBAR_STATE_COOKIE: 'sidebar_state',
+  setPreferenceCookie: (...args: unknown[]) => mockSetPreferenceCookie(...args),
+  getPreferenceCookie: (...args: unknown[]) => mockGetPreferenceCookie(...args),
+}));
+
 const DOMAINS = [
   { domain: 'example.com', status: 'Verified' as const },
   { domain: 'pending.com', status: 'Pending' as const },
@@ -90,6 +156,8 @@ beforeEach(() => {
   global.fetch = jest.fn();
   mockPush.mockReset();
   mockRefresh.mockReset();
+  mockSetPreferenceCookie.mockReset();
+  mockGetPreferenceCookie.mockReturnValue(null);
 });
 
 afterEach(() => {
@@ -207,6 +275,74 @@ describe('SettingsView', () => {
         'href',
         `/inbox/${encodeURIComponent('hello@example.com')}/msg-1`,
       );
+    });
+  });
+
+  describe('preferences section', () => {
+    test('renders preferred address select', () => {
+      renderView();
+      expect(screen.getByTestId('preferred-address-select')).toBeInTheDocument();
+    });
+
+    test('renders sidebar default select', () => {
+      renderView();
+      expect(screen.getByTestId('sidebar-default-select')).toBeInTheDocument();
+    });
+
+    test('shows no-addresses fallback when address list is empty', () => {
+      renderView({ addresses: [] });
+      expect(screen.getByText('No addresses')).toBeInTheDocument();
+    });
+
+    test('saving preferred address writes preference cookie', async () => {
+      const user = userEvent.setup();
+      renderView();
+      await user.selectOptions(
+        screen.getByTestId('preferred-address-select'),
+        'info@example.com',
+      );
+      expect(mockSetPreferenceCookie).toHaveBeenCalledWith(
+        'hermes_preferred_address',
+        'info@example.com',
+      );
+    });
+
+    test('saving sidebar default writes preference cookie', async () => {
+      const user = userEvent.setup();
+      renderView();
+      await user.selectOptions(
+        screen.getByTestId('sidebar-default-select'),
+        'collapsed',
+      );
+      expect(mockSetPreferenceCookie).toHaveBeenCalledWith('sidebar_state', 'false');
+    });
+
+    test('loads existing preferred address from cookie on mount', () => {
+      mockGetPreferenceCookie.mockImplementation((name: string) =>
+        name === 'hermes_preferred_address' ? 'info@example.com' : null,
+      );
+      renderView();
+      expect(screen.getByTestId('preferred-address-select')).toBeInTheDocument();
+    });
+
+    test('loads collapsed sidebar default from cookie on mount', () => {
+      mockGetPreferenceCookie.mockImplementation((name: string) =>
+        name === 'sidebar_state' ? 'false' : null,
+      );
+      renderView();
+      expect(screen.getByTestId('sidebar-default-select')).toBeInTheDocument();
+    });
+  });
+
+  describe('account section', () => {
+    test('renders change password button', () => {
+      renderView();
+      expect(screen.getByTestId('change-password-btn')).toBeInTheDocument();
+    });
+
+    test('renders change password dialog', () => {
+      renderView();
+      expect(screen.getByTestId('change-password-dialog')).toBeInTheDocument();
     });
   });
 });
