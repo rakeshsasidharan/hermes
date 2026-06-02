@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { PREFERRED_ADDRESS_COOKIE } from '@/lib/preferences';
 
 const BASE = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
@@ -12,6 +13,7 @@ interface Address {
 export default async function DefaultPage() {
   const cookieStore = await cookies();
   const cookieHeader = cookieStore.toString();
+  const preferredAddress = cookieStore.get(PREFERRED_ADDRESS_COOKIE)?.value;
 
   const res = await fetch(`${BASE}/api/addresses`, {
     headers: { Cookie: cookieHeader },
@@ -28,7 +30,11 @@ export default async function DefaultPage() {
       });
 
     if (active.length > 0) {
-      redirect(`/inbox/${encodeURIComponent(active[0].email)}`);
+      const target =
+        preferredAddress && active.some((a) => a.email === preferredAddress)
+          ? preferredAddress
+          : active[0].email;
+      redirect(`/inbox/${encodeURIComponent(target)}`);
     }
   }
 

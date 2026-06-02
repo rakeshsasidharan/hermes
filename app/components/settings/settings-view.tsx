@@ -1,11 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Globe,
   AtSign,
@@ -13,11 +20,20 @@ import {
   Clock,
   ChevronDown,
   Plus,
+  KeyRound,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AddDomainDialog } from '@/components/domains/add-domain-dialog';
 import { AddAddressDialog } from '@/components/addresses/add-address-dialog';
 import { DeleteAddressDialog } from '@/components/addresses/delete-address-dialog';
+import { ChangePasswordDialog } from '@/components/settings/change-password-dialog';
+import {
+  PREFERRED_ADDRESS_COOKIE,
+  SIDEBAR_STATE_COOKIE,
+  setPreferenceCookie,
+  getPreferenceCookie,
+} from '@/lib/preferences';
 
 interface Domain {
   domain: string;
@@ -70,6 +86,25 @@ export function SettingsView({
   const [domains, setDomains] = useState<Domain[]>(initialDomains);
   const [addresses, setAddresses] = useState<Address[]>(initialAddresses);
   const [openDomains, setOpenDomains] = useState<Set<string>>(new Set());
+  const [preferredAddress, setPreferredAddress] = useState<string>('');
+  const [sidebarDefault, setSidebarDefault] = useState<'expanded' | 'collapsed'>('expanded');
+
+  useEffect(() => {
+    const pref = getPreferenceCookie(PREFERRED_ADDRESS_COOKIE);
+    if (pref) setPreferredAddress(pref);
+    const sidebar = getPreferenceCookie(SIDEBAR_STATE_COOKIE);
+    setSidebarDefault(sidebar === 'false' ? 'collapsed' : 'expanded');
+  }, []);
+
+  function handlePreferredAddressChange(email: string) {
+    setPreferredAddress(email);
+    setPreferenceCookie(PREFERRED_ADDRESS_COOKIE, email);
+  }
+
+  function handleSidebarDefaultChange(value: 'expanded' | 'collapsed') {
+    setSidebarDefault(value);
+    setPreferenceCookie(SIDEBAR_STATE_COOKIE, value === 'expanded' ? 'true' : 'false');
+  }
 
   function toggleDomain(d: string) {
     setOpenDomains((prev) => {
@@ -288,6 +323,103 @@ export function SettingsView({
           })
         )}
       </div>
+
+      {/* Preferences */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Preferences</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {/* Preferred Address */}
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Default address</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Address shown first when you open Hermes.
+              </p>
+            </div>
+            {addresses.filter((a) => a.status !== 'deleted').length === 0 ? (
+              <p className="text-sm text-muted-foreground">No addresses</p>
+            ) : (
+              <Select
+                value={preferredAddress || addresses.filter((a) => a.status !== 'deleted')[0]?.email}
+                onValueChange={handlePreferredAddressChange}
+              >
+                <SelectTrigger
+                  className="w-[220px] text-sm"
+                  data-testid="preferred-address-select"
+                >
+                  <SelectValue placeholder="Select address" />
+                </SelectTrigger>
+                <SelectContent>
+                  {addresses
+                    .filter((a) => a.status !== 'deleted')
+                    .map((addr) => (
+                      <SelectItem key={addr.email} value={addr.email}>
+                        {addr.email}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          {/* Sidebar default */}
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Sidebar default</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Whether the sidebar starts expanded or collapsed.
+              </p>
+            </div>
+            <Select
+              value={sidebarDefault}
+              onValueChange={(v) => handleSidebarDefaultChange(v as 'expanded' | 'collapsed')}
+            >
+              <SelectTrigger
+                className="w-[140px] text-sm"
+                data-testid="sidebar-default-select"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="expanded">Expanded</SelectItem>
+                <SelectItem value="collapsed">Collapsed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Account */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <KeyRound className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Account</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Password</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Update your account password.
+              </p>
+            </div>
+            <ChangePasswordDialog
+              trigger={
+                <Button variant="outline" size="sm" data-testid="change-password-btn">
+                  Change password
+                </Button>
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Recent Activity */}
       <Card>

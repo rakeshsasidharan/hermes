@@ -1,6 +1,7 @@
 import {
   CognitoIdentityProviderClient,
   InitiateAuthCommand,
+  ChangePasswordCommand,
   type InitiateAuthCommandOutput,
 } from '@aws-sdk/client-cognito-identity-provider';
 
@@ -56,6 +57,25 @@ export async function signIn(username: string, password: string): Promise<AuthTo
     idToken: auth.IdToken,
     expiresIn: auth.ExpiresIn ?? 3600,
   };
+}
+
+export async function changePassword(
+  accessToken: string,
+  previousPassword: string,
+  proposedPassword: string,
+): Promise<void> {
+  try {
+    await cognitoClient.send(
+      new ChangePasswordCommand({
+        AccessToken: accessToken,
+        PreviousPassword: previousPassword,
+        ProposedPassword: proposedPassword,
+      }),
+    );
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to change password';
+    throw new CognitoAuthError(message);
+  }
 }
 
 export async function refreshAccessToken(refreshToken: string): Promise<AuthTokens> {

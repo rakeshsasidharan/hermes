@@ -4,6 +4,7 @@ import { AppSidebar } from '@/components/layout/sidebar';
 import { ConditionalLayout } from '@/components/layout/conditional-layout';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { WebSocketProvider } from '@/components/ws-context';
+import { SIDEBAR_STATE_COOKIE } from '@/lib/preferences';
 
 interface Address {
   email: string;
@@ -40,9 +41,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const addresses = await getAddresses(token);
   const wsEndpoint = process.env.NEXT_PUBLIC_WEBSOCKET_ENDPOINT ?? '';
 
+  const sidebarStateCookie = cookieStore.get(SIDEBAR_STATE_COOKIE)?.value;
+  const defaultSidebarOpen = sidebarStateCookie === undefined ? true : sidebarStateCookie === 'true';
+
   return (
     <WebSocketProvider token={token} wsEndpoint={wsEndpoint}>
-      <SidebarProvider className="h-svh">
+      <SidebarProvider className="h-svh" defaultOpen={defaultSidebarOpen}>
         <AppSidebar addresses={addresses} />
         <SidebarInset className="flex flex-col min-h-0">
           <ConditionalLayout>{children}</ConditionalLayout>
