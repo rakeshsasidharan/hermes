@@ -96,7 +96,6 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
 
   const isOnDraftDetailRoute = /^\/drafts\/[^/]+\/[^/]+$/.test(pathname);
   const [isComposing, setIsComposing] = useState(false);
-  const [isSigningOut, setIsSigningOut] = useState(false);
   const [switchingToAddress, setSwitchingToAddress] = useState<string | null>(null);
 
   // Reset loading states once navigation lands on any new page
@@ -177,14 +176,9 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
     }
   }
 
-  async function handleSignOut() {
-    setIsSigningOut(true);
-    try {
-      await fetch("/api/auth/signout", { method: "POST" });
-      router.push("/login");
-    } catch {
-      setIsSigningOut(false);
-    }
+  function handleSignOut() {
+    router.push("/login");
+    fetch("/api/auth/signout", { method: "POST" });
   }
 
   function handleAddressSwitch(email: string) {
@@ -360,10 +354,9 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onSelect={handleSignOut}
-                  disabled={isSigningOut}
                   data-testid="profile-nav-signout"
                 >
-                  {isSigningOut ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <LogOut className="h-4 w-4 shrink-0" />}
+                  <LogOut className="h-4 w-4 shrink-0" />
                   <span>Sign out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
