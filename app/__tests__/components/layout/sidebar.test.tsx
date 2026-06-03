@@ -413,16 +413,14 @@ describe('AppSidebar', () => {
       expect(screen.getByTestId('profile-nav-settings')).toHaveClass('bg-accent');
     });
 
-    test('calls sign out when Sign out is selected', async () => {
+    test('navigates to /login immediately and fires signout API in background', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({ ok: true });
       const user = userEvent.setup();
       renderSidebar();
       await user.click(screen.getByTestId('profile-trigger'));
       await user.click(screen.getByTestId('profile-nav-signout'));
-      await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith('/api/auth/signout', { method: 'POST' });
-        expect(mockPush).toHaveBeenCalledWith('/login');
-      });
+      expect(mockPush).toHaveBeenCalledWith('/login');
+      expect(global.fetch).toHaveBeenCalledWith('/api/auth/signout', { method: 'POST' });
     });
   });
 });
