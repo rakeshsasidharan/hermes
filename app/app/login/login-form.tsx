@@ -1,30 +1,49 @@
 'use client';
 
-import { useActionState, useEffect } from 'react';
+import { useTransition, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { loginAction, type LoginState } from './actions';
+import { loginAction } from './actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-
-const initialState: LoginState = {};
+import { Loader2 } from 'lucide-react';
 
 export function LoginForm() {
   const router = useRouter();
-  const [state, formAction, isPending] = useActionState(loginAction, initialState);
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | undefined>(undefined);
+  const [success, setSuccess] = useState(false);
+  const [password, setPassword] = useState('');
 
   useEffect(() => {
-    if (state.success) {
+    if (success) {
       router.push('/');
     }
-  }, [state.success, router]);
+  }, [success, router]);
+
+  const isLoading = isPending || success;
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    setError(undefined);
+    startTransition(async () => {
+      const result = await loginAction({}, formData);
+      if (result.error) {
+        setError(result.error);
+        setPassword('');
+      } else if (result.success) {
+        setSuccess(true);
+      }
+    });
+  }
 
   return (
-    <form action={formAction} className="space-y-4">
-      {state.error && (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {error && (
         <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
@@ -36,7 +55,7 @@ export function LoginForm() {
           type="text"
           autoComplete="username"
           required
-          disabled={isPending}
+          disabled={isLoading}
           placeholder="admin"
         />
       </div>
@@ -49,12 +68,15 @@ export function LoginForm() {
           type="password"
           autoComplete="current-password"
           required
-          disabled={isPending}
+          disabled={isLoading}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
         />
       </div>
 
-      <Button type="submit" className="w-full" disabled={isPending}>
-        {isPending ? 'Signing in...' : 'Sign in'}
+      <Button type="submit" className="w-full" disabled={isLoading}>
+        {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+        Sign in
       </Button>
     </form>
   );
