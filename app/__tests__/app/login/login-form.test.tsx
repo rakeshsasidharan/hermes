@@ -2,32 +2,14 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { LoginForm } from '@/app/login/login-form';
 
-// ── Mock server action ────────────────────────────────────────────────────────
 const mockLoginAction = jest.fn();
 jest.mock('@/app/login/actions', () => ({
   loginAction: (...args: unknown[]) => mockLoginAction(...args),
 }));
 
-// ── Mock next/navigation ──────────────────────────────────────────────────────
 const mockPush = jest.fn();
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
-}));
-
-// React's useActionState needs to be shimmed for jsdom
-jest.mock('react', () => ({
-  ...jest.requireActual('react'),
-  useActionState: (
-    action: (state: unknown, formData: FormData) => Promise<unknown>,
-    initialState: unknown,
-  ) => {
-    const [state, setState] = jest.requireActual('react').useState(initialState);
-    const dispatch = async (formData: FormData) => {
-      const newState = await action(state, formData);
-      setState(newState);
-    };
-    return [state, dispatch, false];
-  },
 }));
 
 describe('LoginForm', () => {
@@ -47,6 +29,11 @@ describe('LoginForm', () => {
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
   });
 
+  test('does not show error alert on initial render', () => {
+    render(<LoginForm />);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   test('shows error alert when action returns an error', async () => {
     mockLoginAction.mockResolvedValueOnce({ error: 'Invalid username or password.' });
 
@@ -63,9 +50,19 @@ describe('LoginForm', () => {
     });
   });
 
-  test('does not show error alert on initial render', () => {
+  test('clears password field on error', async () => {
+    mockLoginAction.mockResolvedValueOnce({ error: 'Invalid username or password.' });
+
+    const user = userEvent.setup();
     render(<LoginForm />);
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/username/i), 'admin');
+    await user.type(screen.getByLabelText(/password/i), 'wrongpass');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/password/i)).toHaveValue('');
+    });
   });
 
   test('redirects to / on successful login', async () => {
@@ -80,6 +77,57 @@ describe('LoginForm', () => {
 
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith('/');
+    });
+  });
+
+  test('password field retains value after successful login before navigation', async () => {
+    mockLoginAction.mockResolvedValueOnce({ success: true });
+
+    const user = userEvent.setup();
+    render(<LoginForm />);
+
+    await user.type(screen.getByLabelText(/username/i), 'admin');
+    await user.type(screen.getByLabelText(/password/i), 'mypassword');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/');
+    });
+    expect(screen.getByLabelText(/password/i)).toHaveValue('mypassword');
+  });
+
+  test('button shows spinner and is disabled while loading', async () => {
+    let resolveAction!: (v: unknown) => void;
+    mockLoginAction.mockImplementationOnce(() => new Promise((res) => { resolveAction = res; }));
+
+    const user = userEvent.setup();
+    render(<LoginForm />);
+
+    await user.type(screen.getByLabelText(/username/i), 'admin');
+    await user.type(screen.getByLabelText(/password/i), 'password');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /sign in/i })).toBeDisabled();
+      expect(screen.getByLabelText(/username/i)).toBeDisabled();
+      expect(screen.getByLabelText(/password/i)).toBeDisabled();
+    });
+
+    resolveAction({ success: true });
+  });
+
+  test('button stays disabled after success state before navigation', async () => {
+    mockLoginAction.mockResolvedValueOnce({ success: true });
+
+    const user = userEvent.setup();
+    render(<LoginForm />);
+
+    await user.type(screen.getByLabelText(/username/i), 'admin');
+    await user.type(screen.getByLabelText(/password/i), 'password');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /sign in/i })).toBeDisabled();
     });
   });
 });
