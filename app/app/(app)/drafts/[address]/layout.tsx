@@ -49,16 +49,7 @@ export default async function DraftsAddressLayout({ params, children }: Props) {
 
   return (
     <MailboxLayout
-      list={
-        <div className="flex flex-col h-full">
-          <div className="flex items-center gap-2 border-b px-4 h-14 shrink-0">
-            <h2 className="font-semibold text-sm">Drafts</h2>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            <DraftsList drafts={drafts} />
-          </div>
-        </div>
-      }
+      list={<DraftsList drafts={drafts} address={decoded} />}
       detail={children}
     />
   );
