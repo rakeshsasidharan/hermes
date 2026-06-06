@@ -495,3 +495,167 @@ describe('MessageList — shared', () => {
     expect(screen.queryByLabelText('Unread')).not.toBeInTheDocument();
   });
 });
+
+describe('MessageList — bulk action toolbar', () => {
+  test('renders bulk action toolbar with select-all checkbox', () => {
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+    expect(screen.getByTestId('select-all-checkbox')).toBeInTheDocument();
+    expect(screen.getByTestId('bulk-delete-button')).toBeInTheDocument();
+  });
+
+  test('inbox shows mark read and mark unread buttons', () => {
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+    expect(screen.getByTestId('bulk-mark-read-button')).toBeInTheDocument();
+    expect(screen.getByTestId('bulk-mark-unread-button')).toBeInTheDocument();
+  });
+
+  test('sent folder does not show mark read or mark unread buttons', () => {
+    render(<MessageList {...DEFAULT_OUTBOUND_PROPS} />);
+    expect(screen.queryByTestId('bulk-mark-read-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('bulk-mark-unread-button')).not.toBeInTheDocument();
+  });
+
+  test('junk folder does not show junk button', () => {
+    render(<MessageList
+      address="hello@example.com"
+      direction="inbound"
+      folder="junk"
+      initialMessages={INBOUND_MESSAGES}
+      initialNextCursor={null}
+      folderLabel="Junk"
+    />);
+    expect(screen.queryByTestId('bulk-junk-button')).not.toBeInTheDocument();
+  });
+
+  test('inbox shows junk button', () => {
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+    expect(screen.getByTestId('bulk-junk-button')).toBeInTheDocument();
+  });
+
+  test('action buttons are disabled when nothing is selected', () => {
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+    expect(screen.getByTestId('bulk-delete-button')).toBeDisabled();
+    expect(screen.getByTestId('bulk-junk-button')).toBeDisabled();
+  });
+
+  test('clicking a message checkbox selects it and enables action buttons', async () => {
+    const user = userEvent.setup();
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+    const checkboxes = screen.getAllByLabelText('Select email');
+    await user.click(checkboxes[0]);
+    expect(screen.getByTestId('bulk-delete-button')).not.toBeDisabled();
+    expect(screen.getByTestId('selection-count')).toHaveTextContent('1 selected');
+  });
+
+  test('select all checkbox selects all displayed messages', async () => {
+    const user = userEvent.setup();
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+    await user.click(screen.getByTestId('select-all-checkbox'));
+    expect(screen.getByTestId('selection-count')).toHaveTextContent('2 selected');
+  });
+
+  test('clicking select all then unchecking deselects all', async () => {
+    const user = userEvent.setup();
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+    await user.click(screen.getByTestId('select-all-checkbox'));
+    await user.click(screen.getByTestId('select-all-checkbox'));
+    expect(screen.queryByTestId('selection-count')).not.toBeInTheDocument();
+  });
+
+  test('bulk delete (non-trash) PATCHes messages with folder=trash and removes them from list', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({}) });
+    const user = userEvent.setup();
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+    await user.click(screen.getByTestId('select-all-checkbox'));
+    await user.click(screen.getByTestId('bulk-delete-button'));
+    await waitFor(() => {
+      expect(screen.queryByText('alice@test.com')).not.toBeInTheDocument();
+      expect(screen.queryByText('bob@test.com')).not.toBeInTheDocument();
+    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/messages/'),
+      expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ folder: 'trash' }) }),
+    );
+  });
+
+  test('bulk delete in trash folder calls DELETE endpoint', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({}) });
+    const user = userEvent.setup();
+    render(<MessageList
+      address="hello@example.com"
+      direction="inbound"
+      folder="trash"
+      initialMessages={INBOUND_MESSAGES}
+      initialNextCursor={null}
+      folderLabel="Trash"
+    />);
+    await user.click(screen.getByTestId('select-all-checkbox'));
+    await user.click(screen.getByTestId('bulk-delete-button'));
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/messages/'),
+        expect.objectContaining({ method: 'DELETE' }),
+      );
+    });
+  });
+
+  test('bulk junk removes messages optimistically and PATCHes folder=junk', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({}) });
+    const user = userEvent.setup();
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+    await user.click(screen.getByTestId('select-all-checkbox'));
+    await user.click(screen.getByTestId('bulk-junk-button'));
+    await waitFor(() => {
+      expect(screen.queryByText('alice@test.com')).not.toBeInTheDocument();
+    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/messages/'),
+      expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ folder: 'junk' }) }),
+    );
+  });
+
+  test('bulk mark read PATCHes messages and clears unread badges', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({}) });
+    const user = userEvent.setup();
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+    expect(screen.getByLabelText('Unread')).toBeInTheDocument();
+    await user.click(screen.getByTestId('select-all-checkbox'));
+    await user.click(screen.getByTestId('bulk-mark-read-button'));
+    await waitFor(() => {
+      expect(screen.queryByLabelText('Unread')).not.toBeInTheDocument();
+    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/messages/'),
+      expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ isRead: true }) }),
+    );
+  });
+
+  test('bulk mark unread PATCHes messages and restores unread badges', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({}) });
+    const user = userEvent.setup();
+    const allRead = INBOUND_MESSAGES.map((m) => ({ ...m, isRead: true }));
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} initialMessages={allRead} />);
+    expect(screen.queryByLabelText('Unread')).not.toBeInTheDocument();
+    await user.click(screen.getByTestId('select-all-checkbox'));
+    await user.click(screen.getByTestId('bulk-mark-unread-button'));
+    await waitFor(() => {
+      expect(screen.getAllByLabelText('Unread')).toHaveLength(2);
+    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/messages/'),
+      expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ isRead: false }) }),
+    );
+  });
+
+  test('bulk delete rolls back messages that fail', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: false });
+    const user = userEvent.setup();
+    render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
+    const checkboxes = screen.getAllByLabelText('Select email');
+    await user.click(checkboxes[0]);
+    await user.click(screen.getByTestId('bulk-delete-button'));
+    await waitFor(() => {
+      expect(screen.getByText('alice@test.com')).toBeInTheDocument();
+    });
+  });
+});

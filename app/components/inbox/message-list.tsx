@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useWs } from '@/components/ws-context';
 import { MailboxCard, formatMailboxDate } from '@/components/mailbox-card';
+import { BulkActionToolbar } from '@/components/bulk-action-toolbar';
 
 interface Attachment {
   filename: string;
@@ -46,6 +47,7 @@ export function MessageList({ address, direction, folder, initialMessages, initi
   const [filter, setFilter] = useState<Filter>('all');
   const [isLoading, setIsLoading] = useState(false);
   const [pendingMessageId, setPendingMessageId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const isInboxFolder = folder === 'inbox' || (!folder && direction === 'inbound');
 
@@ -54,16 +56,19 @@ export function MessageList({ address, direction, folder, initialMessages, initi
     return segments.length >= 4 ? segments[3] : null;
   })();
 
-  // Clear pending state once the navigation lands
   useEffect(() => {
     setPendingMessageId(null);
   }, [pathname]);
+
+  // Clear selection when navigating between folders
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [folder, direction]);
 
   useEffect(() => {
     if (!isInboxFolder) return;
     return subscribe((event) => {
       if (event.address.toLowerCase() !== address.toLowerCase()) return;
-      // The WS payload only carries the messageId; fetch the full record.
       fetch(`/api/messages/${encodeURIComponent(event.messageId)}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
@@ -134,14 +139,169 @@ export function MessageList({ address, direction, folder, initialMessages, initi
   function handleRowClick(msg: Message) {
     setPendingMessageId(msg.messageId);
     const root = folder ?? (direction === 'outbound' ? 'sent' : 'inbox');
-    // Optimistically mark as read so the blue dot clears immediately on click,
-    // without waiting for the async PATCH in MessageDetail.
     if (!isSent && !msg.isRead && (folder === 'inbox' || folder === 'junk' || !folder)) {
       setMessages((prev) =>
         prev.map((m) => m.messageId === msg.messageId ? { ...m, isRead: true } : m),
       );
     }
     router.push(`/${root}/${encodeURIComponent(address)}/${msg.messageId}`);
+  }
+
+  function handleSelectToggle(messageId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(messageId)) {
+        next.delete(messageId);
+      } else {
+        next.add(messageId);
+      }
+      return next;
+    });
+  }
+
+  function handleSelectAll() {
+    setSelectedIds(new Set(displayed.map((m) => m.messageId)));
+  }
+
+  function handleDeselectAll() {
+    setSelectedIds(new Set());
+  }
+
+  function navigateAwayIfNeeded(ids: string[]) {
+    if (activeMessageId && ids.includes(activeMessageId)) {
+      const root = folder ?? (direction === 'outbound' ? 'sent' : 'inbox');
+      router.push(`/${root}/${encodeURIComponent(address)}`);
+    }
+  }
+
+  async function handleBulkDelete() {
+    const ids = [...selectedIds];
+    const removed = messages.filter((m) => ids.includes(m.messageId));
+    setMessages((prev) => prev.filter((m) => !selectedIds.has(m.messageId)));
+    setSelectedIds(new Set());
+    navigateAwayIfNeeded(ids);
+
+    const results = await Promise.allSettled(
+      ids.map((id) =>
+        folder === 'trash'
+          ? fetch(`/api/messages/${encodeURIComponent(id)}`, { method: 'DELETE' })
+          : fetch(`/api/messages/${encodeURIComponent(id)}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ folder: 'trash' }),
+            }),
+      ),
+    );
+
+    const failed = removed.filter((_, i) => {
+      const r = results[i];
+      return r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok);
+    });
+    if (failed.length > 0) {
+      setMessages((prev) => {
+        const existing = new Set(prev.map((m) => m.messageId));
+        return [...failed.filter((m) => !existing.has(m.messageId)), ...prev];
+      });
+    }
+  }
+
+  async function handleBulkJunk() {
+    const ids = [...selectedIds];
+    const removed = messages.filter((m) => ids.includes(m.messageId));
+    setMessages((prev) => prev.filter((m) => !selectedIds.has(m.messageId)));
+    setSelectedIds(new Set());
+    navigateAwayIfNeeded(ids);
+
+    const results = await Promise.allSettled(
+      ids.map((id) =>
+        fetch(`/api/messages/${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ folder: 'junk' }),
+        }),
+      ),
+    );
+
+    const failed = removed.filter((_, i) => {
+      const r = results[i];
+      return r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok);
+    });
+    if (failed.length > 0) {
+      setMessages((prev) => {
+        const existing = new Set(prev.map((m) => m.messageId));
+        return [...failed.filter((m) => !existing.has(m.messageId)), ...prev];
+      });
+    }
+  }
+
+  async function handleBulkMarkRead() {
+    const ids = [...selectedIds];
+    const original = messages.map((m) => ({ id: m.messageId, isRead: m.isRead }));
+    setMessages((prev) =>
+      prev.map((m) => selectedIds.has(m.messageId) ? { ...m, isRead: true } : m),
+    );
+    setSelectedIds(new Set());
+
+    const results = await Promise.allSettled(
+      ids.map((id) =>
+        fetch(`/api/messages/${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isRead: true }),
+        }),
+      ),
+    );
+
+    const failedIds = new Set(
+      ids.filter((_, i) => {
+        const r = results[i];
+        return r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok);
+      }),
+    );
+    if (failedIds.size > 0) {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (!failedIds.has(m.messageId)) return m;
+          const orig = original.find((o) => o.id === m.messageId);
+          return orig ? { ...m, isRead: orig.isRead } : m;
+        }),
+      );
+    }
+  }
+
+  async function handleBulkMarkUnread() {
+    const ids = [...selectedIds];
+    const original = messages.map((m) => ({ id: m.messageId, isRead: m.isRead }));
+    setMessages((prev) =>
+      prev.map((m) => selectedIds.has(m.messageId) ? { ...m, isRead: false } : m),
+    );
+    setSelectedIds(new Set());
+
+    const results = await Promise.allSettled(
+      ids.map((id) =>
+        fetch(`/api/messages/${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isRead: false }),
+        }),
+      ),
+    );
+
+    const failedIds = new Set(
+      ids.filter((_, i) => {
+        const r = results[i];
+        return r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok);
+      }),
+    );
+    if (failedIds.size > 0) {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (!failedIds.has(m.messageId)) return m;
+          const orig = original.find((o) => o.id === m.messageId);
+          return orig ? { ...m, isRead: orig.isRead } : m;
+        }),
+      );
+    }
   }
 
   const isSent = direction === 'outbound';
@@ -182,6 +342,17 @@ export function MessageList({ address, direction, folder, initialMessages, initi
         </div>
       </div>
 
+      <BulkActionToolbar
+        totalCount={displayed.length}
+        selectedCount={selectedIds.size}
+        onSelectAll={handleSelectAll}
+        onDeselectAll={handleDeselectAll}
+        onDelete={handleBulkDelete}
+        onJunk={folder === 'junk' ? undefined : handleBulkJunk}
+        onMarkRead={isInboxFolder ? handleBulkMarkRead : undefined}
+        onMarkUnread={isInboxFolder ? handleBulkMarkUnread : undefined}
+      />
+
       <div className={`flex-1 overflow-y-auto${isLoading ? ' opacity-50' : ''}`}>
         {isLoading && messages.length === 0 ? (
           <div className="flex flex-col gap-0">
@@ -216,12 +387,14 @@ export function MessageList({ address, direction, folder, initialMessages, initi
                     isActive={isActive}
                     isLoading={msg.messageId === pendingMessageId}
                     isUnread={isUnread}
+                    isSelected={selectedIds.has(msg.messageId)}
                     displayName={displayName}
                     date={formatMailboxDate(msg.receivedAt)}
                     subject={msg.subject}
                     snippet={msg.snippet}
                     hasAttachments={(msg.attachments?.length ?? 0) > 0}
                     onClick={() => handleRowClick(msg)}
+                    onSelectToggle={() => handleSelectToggle(msg.messageId)}
                   />
                 );
               })}
