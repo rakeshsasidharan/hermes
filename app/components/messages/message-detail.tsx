@@ -204,7 +204,7 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex items-center justify-between border-b px-4 h-14 shrink-0 gap-2">
-        <div className="flex flex-col min-w-0">
+        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           <span className="text-sm font-semibold truncate">{message.subject}</span>
           <span className="text-xs text-muted-foreground truncate">
             {message.from ?? message.sender} · {new Date(message.receivedAt).toLocaleString()}

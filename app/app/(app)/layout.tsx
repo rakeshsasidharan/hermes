@@ -48,7 +48,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <WebSocketProvider token={token} wsEndpoint={wsEndpoint}>
       <SidebarProvider className="h-svh" defaultOpen={defaultSidebarOpen}>
         <AppSidebar addresses={addresses} />
-        <SidebarInset className="flex flex-col min-h-0">
+        <SidebarInset className="flex flex-col min-h-0 overflow-hidden">
           <ConditionalLayout>{children}</ConditionalLayout>
         </SidebarInset>
       </SidebarProvider>
