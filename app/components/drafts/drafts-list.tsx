@@ -22,7 +22,7 @@ interface Draft {
 
 interface DraftsListProps {
   drafts: Draft[];
-  address: string;
+  address?: string;
 }
 
 export function DraftsList({ drafts: initialDrafts, address }: DraftsListProps) {
@@ -84,7 +84,7 @@ export function DraftsList({ drafts: initialDrafts, address }: DraftsListProps) 
     setSelectedIds(new Set());
 
     if (activeDraftId && ids.includes(activeDraftId)) {
-      router.push(`/drafts/${encodeURIComponent(address)}`);
+      router.push(address ? `/drafts/${encodeURIComponent(address)}` : '/drafts');
     }
 
     const results = await Promise.allSettled(
