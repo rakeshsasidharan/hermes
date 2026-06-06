@@ -24,8 +24,8 @@ export function Topbar() {
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4">
       <SidebarTrigger />
-      <h1 className="text-sm font-medium text-foreground truncate">{title}</h1>
-      <div className="ml-auto">
+      <h1 className="flex-1 min-w-0 text-sm font-medium text-foreground truncate">{title}</h1>
+      <div className="shrink-0">
         <ThemeToggle />
       </div>
     </header>
