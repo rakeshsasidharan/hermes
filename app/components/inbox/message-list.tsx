@@ -203,6 +203,7 @@ export function MessageList({ address, direction, folder, initialMessages, initi
         return [...failed.filter((m) => !existing.has(m.messageId)), ...prev];
       });
     }
+    router.refresh();
   }
 
   async function handleBulkJunk() {
@@ -232,6 +233,7 @@ export function MessageList({ address, direction, folder, initialMessages, initi
         return [...failed.filter((m) => !existing.has(m.messageId)), ...prev];
       });
     }
+    router.refresh();
   }
 
   async function handleBulkMarkRead() {
@@ -267,6 +269,7 @@ export function MessageList({ address, direction, folder, initialMessages, initi
         }),
       );
     }
+    router.refresh();
   }
 
   async function handleBulkMarkUnread() {
@@ -302,6 +305,7 @@ export function MessageList({ address, direction, folder, initialMessages, initi
         }),
       );
     }
+    router.refresh();
   }
 
   const isSent = direction === 'outbound';

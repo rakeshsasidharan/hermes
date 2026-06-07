@@ -4,7 +4,7 @@ import { MessageList } from '@/components/inbox/message-list';
 import type { WsNewMessageEvent } from '@/lib/ws';
 
 jest.mock('next/navigation', () => ({
-  useRouter: jest.fn().mockReturnValue({ push: jest.fn() }),
+  useRouter: jest.fn().mockReturnValue({ push: jest.fn(), refresh: jest.fn() }),
   usePathname: jest.fn().mockReturnValue('/inbox/hello%40example.com'),
 }));
 
@@ -300,7 +300,7 @@ describe('MessageList — folder prop (junk)', () => {
   test('navigates to /junk/[address]/[messageId] on row click', async () => {
     const { useRouter } = require('next/navigation');
     const mockPush = jest.fn();
-    useRouter.mockReturnValue({ push: mockPush });
+    useRouter.mockReturnValue({ push: mockPush, refresh: jest.fn() });
     const user = userEvent.setup();
     render(<MessageList {...JUNK_PROPS} />);
     await user.click(screen.getByTestId('message-row-msg-1'));
@@ -327,7 +327,7 @@ describe('MessageList — folder prop (junk)', () => {
 
   test('optimistically clears unread badge when clicking an unread junk message', async () => {
     const { useRouter } = require('next/navigation');
-    useRouter.mockReturnValue({ push: jest.fn() });
+    useRouter.mockReturnValue({ push: jest.fn(), refresh: jest.fn() });
     const user = userEvent.setup();
     render(<MessageList {...JUNK_PROPS} />);
     expect(screen.getByLabelText('Unread')).toBeInTheDocument();
@@ -378,7 +378,7 @@ describe('MessageList — folder prop (trash)', () => {
   test('navigates to /trash/[address]/[messageId] on row click', async () => {
     const { useRouter } = require('next/navigation');
     const mockPush = jest.fn();
-    useRouter.mockReturnValue({ push: mockPush });
+    useRouter.mockReturnValue({ push: mockPush, refresh: jest.fn() });
     const user = userEvent.setup();
     render(<MessageList {...TRASH_PROPS} />);
     await user.click(screen.getByTestId('message-row-msg-1'));
@@ -456,7 +456,7 @@ describe('MessageList — shared', () => {
   test('navigates to /inbox/[address]/[messageId] for inbound', async () => {
     const { useRouter } = require('next/navigation');
     const mockPush = jest.fn();
-    useRouter.mockReturnValue({ push: mockPush });
+    useRouter.mockReturnValue({ push: mockPush, refresh: jest.fn() });
     const user = userEvent.setup();
     render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
     await user.click(screen.getByTestId('message-row-msg-1'));
@@ -466,7 +466,7 @@ describe('MessageList — shared', () => {
   test('navigates to /sent/[address]/[messageId] for outbound', async () => {
     const { useRouter } = require('next/navigation');
     const mockPush = jest.fn();
-    useRouter.mockReturnValue({ push: mockPush });
+    useRouter.mockReturnValue({ push: mockPush, refresh: jest.fn() });
     const user = userEvent.setup();
     render(<MessageList {...DEFAULT_OUTBOUND_PROPS} />);
     await user.click(screen.getByTestId('message-row-msg-out'));
@@ -475,7 +475,7 @@ describe('MessageList — shared', () => {
 
   test('optimistically clears unread badge when clicking an unread inbox message', async () => {
     const { useRouter } = require('next/navigation');
-    useRouter.mockReturnValue({ push: jest.fn() });
+    useRouter.mockReturnValue({ push: jest.fn(), refresh: jest.fn() });
     const user = userEvent.setup();
     render(<MessageList {...DEFAULT_INBOUND_PROPS} />);
     expect(screen.getByLabelText('Unread')).toBeInTheDocument();
@@ -487,7 +487,7 @@ describe('MessageList — shared', () => {
 
   test('does not optimistically clear unread badge for outbound messages', async () => {
     const { useRouter } = require('next/navigation');
-    useRouter.mockReturnValue({ push: jest.fn() });
+    useRouter.mockReturnValue({ push: jest.fn(), refresh: jest.fn() });
     const unreadOutbound = [{ ...OUTBOUND_MESSAGES[0], isRead: false }];
     const user = userEvent.setup();
     render(<MessageList {...DEFAULT_OUTBOUND_PROPS} initialMessages={unreadOutbound} />);

@@ -5,8 +5,9 @@ import { DraftsList } from '@/components/drafts/drafts-list';
 const mockPush = jest.fn();
 const mockPathname = jest.fn().mockReturnValue('/drafts/me%40hermes.com');
 
+const mockRefresh = jest.fn();
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, refresh: mockRefresh }),
   usePathname: () => mockPathname(),
 }));
 

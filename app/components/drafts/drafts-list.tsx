@@ -103,6 +103,7 @@ export function DraftsList({ drafts: initialDrafts, address }: DraftsListProps) 
         return [...failed.filter((d) => !existing.has(d.draftId)), ...prev];
       });
     }
+    router.refresh();
   }
 
   return (
