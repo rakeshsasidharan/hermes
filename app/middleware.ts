@@ -7,7 +7,7 @@ import {
   REFRESH_TOKEN_COOKIE,
 } from '@/lib/auth/cookies';
 
-const PUBLIC_PATHS = ['/login', '/api/auth/signout'];
+const PUBLIC_PATHS = ['/login', '/api/auth/signout', '/api/send'];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

@@ -43,6 +43,7 @@ function buildApp() {
     messagesTable: storageStack.messagesTable,
     draftsTable: storageStack.draftsTable,
     wsConnectionsTable: storageStack.wsConnectionsTable,
+    apiKeysTable: storageStack.apiKeysTable,
     sesRuleSetName: 'hermes-receipt-rules',
     websocketEndpoint: webSocketStack.webSocketEndpoint,
     inboundProcessorArn: emailStack.inboundEmailProcessor.functionArn,

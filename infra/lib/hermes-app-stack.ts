@@ -25,6 +25,7 @@ export interface HermesAppStackProps extends cdk.StackProps {
   messagesTable: dynamodb.ITable;
   draftsTable: dynamodb.ITable;
   wsConnectionsTable: dynamodb.ITable;
+  apiKeysTable: dynamodb.ITable;
   sesRuleSetName: string;
   websocketEndpoint: string;
   inboundProcessorArn: string;
@@ -69,6 +70,7 @@ export class HermesAppStack extends cdk.Stack {
       sid: 'SesPermissions',
       actions: [
         'ses:SendRawEmail',
+        'ses:SendEmail',
         'ses:ListIdentities',
         'ses:CreateEmailIdentity',
         'ses:DeleteEmailIdentity',
@@ -100,6 +102,7 @@ export class HermesAppStack extends cdk.Stack {
     props.messagesTable.grantReadWriteData(executionRole);
     props.draftsTable.grantReadWriteData(executionRole);
     props.wsConnectionsTable.grantReadWriteData(executionRole);
+    props.apiKeysTable.grantReadWriteData(executionRole);
 
     executionRole.addToPolicy(new iam.PolicyStatement({
       sid: 'CognitoPermissions',
@@ -140,6 +143,7 @@ export class HermesAppStack extends cdk.Stack {
         COGNITO_CLIENT_ID: props.userPoolClient.ref,
         NEXT_PUBLIC_WEBSOCKET_ENDPOINT: props.websocketEndpoint,
         INBOUND_PROCESSOR_ARN: props.inboundProcessorArn,
+        API_KEYS_TABLE: props.apiKeysTable.tableName,
         ...(hostedZone ? { HOSTED_ZONE_ID: hostedZone.hostedZoneId } : {}),
       },
     });
