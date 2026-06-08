@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils';
 import { AddDomainDialog } from '@/components/domains/add-domain-dialog';
 import { AddAddressDialog } from '@/components/addresses/add-address-dialog';
 import { DeleteAddressDialog } from '@/components/addresses/delete-address-dialog';
+import { ApiKeysDialog } from '@/components/addresses/api-keys-dialog';
 import { ChangePasswordDialog } from '@/components/settings/change-password-dialog';
 import {
   PREFERRED_ADDRESS_COOKIE,
@@ -294,10 +295,13 @@ export function SettingsView({
                                     Added {new Date(addr.createdAt).toLocaleDateString()}
                                   </span>
                                 </div>
-                                <DeleteAddressDialog
-                                  email={addr.email}
-                                  onSuccess={() => handleAddressDeleted(addr.email)}
-                                />
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <ApiKeysDialog email={addr.email} />
+                                  <DeleteAddressDialog
+                                    email={addr.email}
+                                    onSuccess={() => handleAddressDeleted(addr.email)}
+                                  />
+                                </div>
                               </li>
                             ))}
                           </ul>

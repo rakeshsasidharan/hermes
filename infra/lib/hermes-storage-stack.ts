@@ -12,6 +12,7 @@ export interface HermesStorageStackProps extends cdk.StackProps {
   messagesTableName?: string;
   draftsTableName?: string;
   wsConnectionsTableName?: string;
+  apiKeysTableName?: string;
 }
 
 export class HermesStorageStack extends cdk.Stack {
@@ -20,6 +21,7 @@ export class HermesStorageStack extends cdk.Stack {
   public readonly messagesTable: dynamodb.Table;
   public readonly draftsTable: dynamodb.Table;
   public readonly wsConnectionsTable: dynamodb.Table;
+  public readonly apiKeysTable: dynamodb.Table;
 
   constructor(scope: Construct, id: string, props?: HermesStorageStackProps) {
     super(scope, id, props);
@@ -91,5 +93,18 @@ export class HermesStorageStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
     cdk.Tags.of(this.wsConnectionsTable).add(HERMES_TAG.key, HERMES_TAG.value);
+
+    this.apiKeysTable = new dynamodb.Table(this, 'ApiKeysTable', {
+      tableName: props?.apiKeysTableName ?? 'hermes-api-keys',
+      partitionKey: { name: 'keyHash', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    this.apiKeysTable.addGlobalSecondaryIndex({
+      indexName: 'address-createdAt-index',
+      partitionKey: { name: 'address', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'createdAt', type: dynamodb.AttributeType.STRING },
+    });
+    cdk.Tags.of(this.apiKeysTable).add(HERMES_TAG.key, HERMES_TAG.value);
   }
 }

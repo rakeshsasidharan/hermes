@@ -37,6 +37,7 @@ const storageStack = new HermesStorageStack(app, 'HermesStorageStack', {
   messagesTableName: config.messagesTableName,
   draftsTableName: config.draftsTableName,
   wsConnectionsTableName: config.wsConnectionsTableName,
+  apiKeysTableName: config.apiKeysTableName,
 });
 
 const webSocketStack = new HermesWebSocketStack(app, 'HermesWebSocketStack', {
@@ -79,6 +80,7 @@ new HermesAppStack(app, 'HermesAppStack', {
   messagesTable: storageStack.messagesTable,
   draftsTable: storageStack.draftsTable,
   wsConnectionsTable: storageStack.wsConnectionsTable,
+  apiKeysTable: storageStack.apiKeysTable,
   sesRuleSetName: config.sesRuleSetName,
   websocketEndpoint: webSocketStack.webSocketEndpoint,
   inboundProcessorArn: emailStack.inboundEmailProcessor.functionArn,

@@ -9,6 +9,7 @@ export interface HermesConfig {
   messagesTableName: string;
   draftsTableName: string;
   wsConnectionsTableName: string;
+  apiKeysTableName: string;
 }
 
 export function getConfig(app: cdk.App): HermesConfig {
@@ -35,5 +36,6 @@ export function getConfig(app: cdk.App): HermesConfig {
     messagesTableName: optional('messagesTableName', 'hermes-messages'),
     draftsTableName: optional('draftsTableName', 'hermes-drafts'),
     wsConnectionsTableName: optional('wsConnectionsTableName', 'hermes-ws-connections'),
+    apiKeysTableName: optional('apiKeysTableName', 'hermes-api-keys'),
   };
 }

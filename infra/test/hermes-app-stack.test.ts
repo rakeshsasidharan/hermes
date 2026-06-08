@@ -11,6 +11,7 @@ const MOCK_ADDRESSES_ARN = 'arn:aws:dynamodb:us-east-1:123456789012:table/hermes
 const MOCK_MESSAGES_ARN = 'arn:aws:dynamodb:us-east-1:123456789012:table/hermes-messages';
 const MOCK_DRAFTS_ARN = 'arn:aws:dynamodb:us-east-1:123456789012:table/hermes-drafts';
 const MOCK_WS_ARN = 'arn:aws:dynamodb:us-east-1:123456789012:table/hermes-ws-connections';
+const MOCK_API_KEYS_ARN = 'arn:aws:dynamodb:us-east-1:123456789012:table/hermes-api-keys';
 const MOCK_WS_ENDPOINT = 'wss://abc123.execute-api.us-east-1.amazonaws.com/prod';
 
 function buildStack(app: cdk.App, stackId = 'TestHermesAppStack') {
@@ -22,6 +23,7 @@ function buildStack(app: cdk.App, stackId = 'TestHermesAppStack') {
   const messagesTable = dynamodb.Table.fromTableArn(helperStack, 'MockMessages', MOCK_MESSAGES_ARN);
   const draftsTable = dynamodb.Table.fromTableArn(helperStack, 'MockDrafts', MOCK_DRAFTS_ARN);
   const wsTable = dynamodb.Table.fromTableArn(helperStack, 'MockWs', MOCK_WS_ARN);
+  const apiKeysTable = dynamodb.Table.fromTableArn(helperStack, 'MockApiKeys', MOCK_API_KEYS_ARN);
 
   const userPool = new cognito.CfnUserPool(authStack, 'UserPool', { userPoolName: 'hermes-user-pool' });
   const userPoolClient = new cognito.CfnUserPoolClient(authStack, 'UserPoolClient', {
@@ -35,6 +37,7 @@ function buildStack(app: cdk.App, stackId = 'TestHermesAppStack') {
     messagesTable,
     draftsTable,
     wsConnectionsTable: wsTable,
+    apiKeysTable,
     sesRuleSetName: 'hermes-receipt-rules',
     websocketEndpoint: MOCK_WS_ENDPOINT,
     inboundProcessorArn: 'arn:aws:lambda:us-east-1:123456789012:function:hermes-inbound-email-processor',
@@ -202,6 +205,7 @@ describe('HermesAppStack', () => {
       const messagesTable = dynamodb.Table.fromTableArn(helperStack, 'MockMessages', MOCK_MESSAGES_ARN);
       const draftsTable = dynamodb.Table.fromTableArn(helperStack, 'MockDrafts', MOCK_DRAFTS_ARN);
       const wsTable = dynamodb.Table.fromTableArn(helperStack, 'MockWs', MOCK_WS_ARN);
+      const apiKeysTable = dynamodb.Table.fromTableArn(helperStack, 'MockApiKeysDomain', MOCK_API_KEYS_ARN);
       const mockCert = acm.Certificate.fromCertificateArn(
         helperStack,
         'MockCert',
@@ -220,6 +224,7 @@ describe('HermesAppStack', () => {
         messagesTable,
         draftsTable,
         wsConnectionsTable: wsTable,
+        apiKeysTable,
         sesRuleSetName: 'hermes-receipt-rules',
         websocketEndpoint: MOCK_WS_ENDPOINT,
         inboundProcessorArn: 'arn:aws:lambda:us-east-1:123456789012:function:hermes-inbound-email-processor',
