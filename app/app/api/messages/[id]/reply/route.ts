@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, PutCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
-import { SESClient, SendRawEmailCommand } from '@aws-sdk/client-ses';
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { requireAuth, AuthError } from '@/lib/auth/require-auth';
 import nodemailer from 'nodemailer';
 
@@ -15,7 +15,7 @@ function getS3() {
 }
 
 function getSES() {
-  return new SESClient({ region: process.env.AWS_REGION ?? 'us-east-1' });
+  return new SESv2Client({ region: process.env.AWS_REGION ?? 'us-east-1' });
 }
 
 export async function POST(
@@ -96,8 +96,8 @@ export async function POST(
     attachments: mimeAttachments,
   });
 
-  await getSES().send(new SendRawEmailCommand({
-    RawMessage: { Data: info.message as Buffer },
+  await getSES().send(new SendEmailCommand({
+    Content: { Raw: { Data: info.message as Buffer } },
   }));
 
   const messageId = crypto.randomUUID();

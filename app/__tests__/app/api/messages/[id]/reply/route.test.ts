@@ -32,9 +32,9 @@ jest.mock('@aws-sdk/client-s3', () => ({
 }));
 
 const mockSESSend = jest.fn();
-jest.mock('@aws-sdk/client-ses', () => ({
-  SESClient: jest.fn().mockImplementation(() => ({ send: mockSESSend })),
-  SendRawEmailCommand: jest.fn((p: unknown) => p),
+jest.mock('@aws-sdk/client-sesv2', () => ({
+  SESv2Client: jest.fn().mockImplementation(() => ({ send: mockSESSend })),
+  SendEmailCommand: jest.fn((p: unknown) => p),
 }));
 
 jest.mock('nodemailer', () => ({
