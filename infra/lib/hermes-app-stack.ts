@@ -69,7 +69,6 @@ export class HermesAppStack extends cdk.Stack {
     executionRole.addToPolicy(new iam.PolicyStatement({
       sid: 'SesPermissions',
       actions: [
-        'ses:SendRawEmail',
         'ses:SendEmail',
         'ses:ListIdentities',
         'ses:CreateEmailIdentity',

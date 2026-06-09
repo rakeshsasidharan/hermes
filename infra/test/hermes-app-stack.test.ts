@@ -104,7 +104,7 @@ describe('HermesAppStack', () => {
           Statement: Match.arrayWith([
             Match.objectLike({
               Sid: 'SesPermissions',
-              Action: Match.arrayWith(['ses:SendRawEmail', 'ses:ListIdentities']),
+              Action: Match.arrayWith(['ses:SendEmail', 'ses:ListIdentities']),
               Effect: 'Allow',
             }),
           ]),
