@@ -1,45 +1,33 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { FileText } from 'lucide-react';
+import { FileText, Loader2 } from 'lucide-react';
 import { MailboxCard, formatMailboxDate } from '@/components/mailbox-card';
 import { BulkActionToolbar } from '@/components/bulk-action-toolbar';
 import { tryNavigate } from '@/lib/navigation-guard';
-
-interface Draft {
-  draftId: string;
-  from?: string;
-  to?: string;
-  subject?: string;
-  body?: string;
-  cc?: string;
-  bcc?: string;
-  attachmentKeys?: string[];
-  inReplyToMessageId?: string;
-  updatedAt: string;
-}
+import { useGetDraftsQuery, apiSlice, type Draft } from '@/store/api';
+import { useDispatch } from 'react-redux';
+import type { AppDispatch } from '@/store';
 
 interface DraftsListProps {
-  drafts: Draft[];
-  address?: string;
+  address: string;
 }
 
-export function DraftsList({ drafts: initialDrafts, address }: DraftsListProps) {
+export function DraftsList({ address }: DraftsListProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [drafts, setDrafts] = useState<Draft[]>(initialDrafts);
+  const dispatch = useDispatch<AppDispatch>();
   const [pendingDraftId, setPendingDraftId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const { data, isLoading } = useGetDraftsQuery(address);
+  const drafts = data?.drafts ?? [];
 
   const activeDraftId = (() => {
     const segments = pathname.split('/');
     return segments.length >= 4 ? segments[3] : null;
   })();
-
-  useEffect(() => {
-    setPendingDraftId(null);
-  }, [pathname]);
 
   function handleDraftClick(draft: Draft) {
     if (draft.inReplyToMessageId) {
@@ -79,12 +67,17 @@ export function DraftsList({ drafts: initialDrafts, address }: DraftsListProps) 
 
   async function handleBulkDelete() {
     const ids = [...selectedIds];
-    const removed = drafts.filter((d) => ids.includes(d.draftId));
-    setDrafts((prev) => prev.filter((d) => !selectedIds.has(d.draftId)));
+    const draftsToRemove = drafts.filter((d) => ids.includes(d.draftId));
+
+    const patchResult = dispatch(
+      apiSlice.util.updateQueryData('getDrafts', address, (draft) => {
+        draft.drafts = draft.drafts.filter((d) => !ids.includes(d.draftId));
+      }),
+    );
     setSelectedIds(new Set());
 
     if (activeDraftId && ids.includes(activeDraftId)) {
-      router.push(address ? `/drafts/${encodeURIComponent(address)}` : '/drafts');
+      router.push(`/drafts/${encodeURIComponent(address)}`);
     }
 
     const results = await Promise.allSettled(
@@ -93,17 +86,29 @@ export function DraftsList({ drafts: initialDrafts, address }: DraftsListProps) 
       ),
     );
 
-    const failed = removed.filter((_, i) => {
+    const failed = draftsToRemove.filter((_, i) => {
       const r = results[i];
       return r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok);
     });
+
     if (failed.length > 0) {
-      setDrafts((prev) => {
-        const existing = new Set(prev.map((d) => d.draftId));
-        return [...failed.filter((d) => !existing.has(d.draftId)), ...prev];
-      });
+      patchResult.undo();
+      const succeededIds = new Set(
+        ids.filter((_, i) => {
+          const r = results[i];
+          return r.status === 'fulfilled' && r.value.ok;
+        }),
+      );
+      if (succeededIds.size > 0) {
+        dispatch(
+          apiSlice.util.updateQueryData('getDrafts', address, (draft) => {
+            draft.drafts = draft.drafts.filter((d) => !succeededIds.has(d.draftId));
+          }),
+        );
+      }
     }
-    router.refresh();
+
+    dispatch(apiSlice.util.invalidateTags(['Draft']));
   }
 
   return (
@@ -121,7 +126,11 @@ export function DraftsList({ drafts: initialDrafts, address }: DraftsListProps) 
       />
 
       <div className="flex-1 overflow-y-auto">
-        {drafts.length === 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20 h-full" data-testid="drafts-loading">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : drafts.length === 0 ? (
           <div
             className="flex flex-col items-center justify-center gap-3 py-20 text-center h-full"
             data-testid="drafts-empty-state"

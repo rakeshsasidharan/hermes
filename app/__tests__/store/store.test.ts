@@ -30,4 +30,12 @@ describe('apiSlice', () => {
   it('exposes endpoints object', () => {
     expect(apiSlice.endpoints).toBeDefined();
   });
+
+  it('exposes getDrafts query endpoint', () => {
+    expect(apiSlice.endpoints.getDrafts).toBeDefined();
+  });
+
+  it('exposes sendEmail mutation endpoint', () => {
+    expect(apiSlice.endpoints.sendEmail).toBeDefined();
+  });
 });

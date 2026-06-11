@@ -18,8 +18,10 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { BookMarked, Paperclip, Send, Trash2, X } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useCompose, type ComposeInitialData } from '@/components/compose-context';
+import { useSendEmailMutation, apiSlice } from '@/store/api';
+import { useDispatch } from 'react-redux';
+import type { AppDispatch } from '@/store';
 
 interface Address {
   email: string;
@@ -70,7 +72,8 @@ interface ComposeSheetInnerProps {
 }
 
 function ComposeSheetInner({ addresses, initialData, onClose }: ComposeSheetInnerProps) {
-  const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
+  const [sendEmail] = useSendEmailMutation();
   const activeAddresses = addresses.filter((a) => a.status !== 'deleted');
 
   const form = useForm<ComposeFormValues>({
@@ -176,29 +179,20 @@ function ComposeSheetInner({ addresses, initialData, onClose }: ComposeSheetInne
     setIsSending(true);
     setSendError(null);
     try {
-      const res = await fetch('/api/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from: values.from,
-          to: values.to,
-          cc: values.cc || undefined,
-          bcc: values.bcc || undefined,
-          subject: values.subject,
-          body: values.body,
-          attachmentKeys: attachments.map((a) => a.s3Key),
-          draftId: draftIdRef.current ?? undefined,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json() as { error?: string };
-        setSendError(data.error ?? 'Failed to send email');
-        return;
-      }
+      await sendEmail({
+        from: values.from,
+        to: values.to,
+        cc: values.cc || undefined,
+        bcc: values.bcc || undefined,
+        subject: values.subject,
+        body: values.body,
+        attachmentKeys: attachments.map((a) => a.s3Key),
+        draftId: draftIdRef.current ?? undefined,
+      }).unwrap();
       onClose();
-      router.refresh();
-    } catch {
-      setSendError('Failed to send email. Please try again.');
+    } catch (err) {
+      const message = (err as { data?: { error?: string } })?.data?.error;
+      setSendError(message ?? 'Failed to send email. Please try again.');
     } finally {
       setIsSending(false);
     }
@@ -207,9 +201,9 @@ function ComposeSheetInner({ addresses, initialData, onClose }: ComposeSheetInne
   async function handleDiscard() {
     if (draftIdRef.current) {
       await fetch(`/api/drafts/${draftIdRef.current}`, { method: 'DELETE' }).catch(() => null);
+      dispatch(apiSlice.util.invalidateTags(['Draft']));
     }
     onClose();
-    router.refresh();
   }
 
   function formatSavedAt(date: Date) {
@@ -362,7 +356,7 @@ function ComposeSheetInner({ addresses, initialData, onClose }: ComposeSheetInne
                     <Textarea
                       {...field}
                       placeholder="Write your message…"
-                      className="min-h-[200px] resize-y"
+                      className="min-h-50 resize-y"
                       onChange={(e) => {
                         field.onChange(e);
                       }}

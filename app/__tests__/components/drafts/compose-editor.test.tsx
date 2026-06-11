@@ -8,10 +8,26 @@ jest.mock('@/lib/navigation-guard', () => ({
 }));
 
 const mockPush = jest.fn();
-const mockRefresh = jest.fn();
 
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush, refresh: mockRefresh }),
+  useRouter: () => ({ push: mockPush }),
+}));
+
+const mockSendEmailUnwrap = jest.fn().mockResolvedValue({ messageId: 'new-msg' });
+const mockSendEmail = jest.fn(() => ({ unwrap: mockSendEmailUnwrap }));
+const mockInvalidateTags = jest.fn(() => ({ type: 'test/invalidate' }));
+jest.mock('@/store/api', () => ({
+  useSendEmailMutation: () => [mockSendEmail],
+  apiSlice: {
+    util: {
+      invalidateTags: (...args: unknown[]) => mockInvalidateTags(...args),
+    },
+  },
+}));
+
+const mockDispatch = jest.fn((action) => action);
+jest.mock('react-redux', () => ({
+  useDispatch: () => mockDispatch,
 }));
 
 jest.mock('@/components/ui/scroll-area', () => ({
@@ -49,8 +65,12 @@ const EMPTY_DRAFT = {
 
 beforeEach(() => {
   global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
+  mockSendEmailUnwrap.mockResolvedValue({ messageId: 'new-msg' });
   mockPush.mockReset();
-  mockRefresh.mockReset();
+  mockDispatch.mockClear();
+  mockSendEmail.mockClear();
+  mockSendEmailUnwrap.mockClear();
+  mockInvalidateTags.mockClear();
 });
 
 afterEach(() => {
@@ -140,29 +160,24 @@ describe('ComposeEditor', () => {
       });
     });
 
-    test('calls POST /api/messages on send with valid To', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: async () => ({ messageId: 'new-msg' }),
-      });
+    test('calls sendEmail mutation on send with valid To', async () => {
       const user = userEvent.setup();
       render(<ComposeEditor draft={DRAFT} address="me@hermes.com" />);
 
       await user.click(screen.getByTestId('compose-send-button'));
 
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(
-          '/api/messages',
-          expect.objectContaining({ method: 'POST' }),
+        expect(mockSendEmail).toHaveBeenCalledWith(
+          expect.objectContaining({
+            from: DRAFT.from,
+            to: DRAFT.to,
+            draftId: DRAFT.draftId,
+          }),
         );
       });
     });
 
     test('navigates to drafts list after successful send', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: async () => ({ messageId: 'new-msg' }),
-      });
       const user = userEvent.setup();
       render(<ComposeEditor draft={DRAFT} address="me@hermes.com" />);
 
@@ -176,10 +191,7 @@ describe('ComposeEditor', () => {
     });
 
     test('shows error when send fails', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: false,
-        json: async () => ({ error: 'Send failed' }),
-      });
+      mockSendEmailUnwrap.mockRejectedValueOnce({ data: { error: 'Send failed' } });
       const user = userEvent.setup();
       render(<ComposeEditor draft={DRAFT} address="me@hermes.com" />);
 
