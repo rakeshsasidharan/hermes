@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { setNavigationGuard } from '@/lib/navigation-guard';
+import { useSendEmailMutation, apiSlice } from '@/store/api';
+import { useDispatch } from 'react-redux';
+import type { AppDispatch } from '@/store';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,6 +43,8 @@ function validateEmail(value: string): boolean {
 
 export function ComposeEditor({ draft, address }: ComposeEditorProps) {
   const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
+  const [sendEmail] = useSendEmailMutation();
 
   const [to, setTo] = useState(draft.to ?? '');
   const [subject, setSubject] = useState(draft.subject ?? '');
@@ -131,27 +136,18 @@ export function ComposeEditor({ draft, address }: ComposeEditorProps) {
     setIsSending(true);
     setSendError(null);
     try {
-      const res = await fetch('/api/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from: draft.from,
-          to,
-          subject,
-          body,
-          draftId: draft.draftId,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json() as { error?: string };
-        setSendError(data.error ?? 'Failed to send email');
-        return;
-      }
+      await sendEmail({
+        from: draft.from ?? '',
+        to,
+        subject,
+        body,
+        draftId: draft.draftId,
+      }).unwrap();
       shouldDeleteOnNavigateRef.current = false; // API already deleted the draft
       router.push(`/drafts/${encodeURIComponent(address)}`);
-      router.refresh();
-    } catch {
-      setSendError('Failed to send email. Please try again.');
+    } catch (err) {
+      const message = (err as { data?: { error?: string } })?.data?.error;
+      setSendError(message ?? 'Failed to send email. Please try again.');
     } finally {
       setIsSending(false);
     }
@@ -160,13 +156,13 @@ export function ComposeEditor({ draft, address }: ComposeEditorProps) {
   async function doDiscard() {
     shouldDeleteOnNavigateRef.current = false;
     await fetch(`/api/drafts/${draft.draftId}`, { method: 'DELETE' }).catch(() => null);
+    dispatch(apiSlice.util.invalidateTags(['Draft']));
     const pendingNav = pendingNavigationRef.current;
     pendingNavigationRef.current = null;
     if (pendingNav) {
       pendingNav();
     } else {
       router.push(`/drafts/${encodeURIComponent(address)}`);
-      router.refresh();
     }
   }
 
