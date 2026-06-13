@@ -19,6 +19,11 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ReplyComposer } from '@/components/messages/reply-composer';
+import {
+  useMarkReadStatusMutation,
+  useMoveMessageMutation,
+  useDeleteMessageMutation,
+} from '@/store/api';
 
 interface Attachment {
   filename: string;
@@ -60,6 +65,17 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
   const showReadToggle = folder === 'inbox' || folder === 'junk';
   const listHref = pathname.split('/').slice(0, 3).join('/');
 
+  // Derive the cache context from the current route
+  const fromFolder = (folder === 'inbox' || folder === 'junk' || folder === 'trash')
+    ? (folder as 'inbox' | 'junk' | 'trash')
+    : undefined;
+  const fromDirection = (!fromFolder && !isSent) ? 'inbound' : (isSent ? 'outbound' : undefined);
+  const fromAddress = message.address ?? (isSent ? message.from : message.to) ?? '';
+
+  const [markReadStatus] = useMarkReadStatusMutation();
+  const [moveMessage] = useMoveMessageMutation();
+  const [deleteMsg] = useDeleteMessageMutation();
+
   const [htmlBody] = useState<string | null>(initialHtmlBody ?? null);
   const [textBody] = useState<string | null>(initialTextBody ?? null);
   const [isRead, setIsRead] = useState(message.isRead);
@@ -69,25 +85,17 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
   const [isMovingToJunk, setIsMovingToJunk] = useState(false);
   const [isTogglingRead, setIsTogglingRead] = useState(false);
 
-  function dispatchReadEvent(messageId: string, isRead: boolean) {
-    window.dispatchEvent(new CustomEvent('hermes:readstatus', { detail: { messageId, isRead } }));
-  }
-
+  // Auto-mark as read when opening an unread message in inbox or junk
   useEffect(() => {
     if (!showReadToggle || message.isRead) return;
-    fetch(`/api/messages/${message.messageId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isRead: true }),
-    }).then((r) => {
-      if (r.ok) {
-        setIsRead(true);
-        dispatchReadEvent(message.messageId, true);
-        // Bust the Next.js Router Cache so navigating back to the inbox
-        // re-fetches from the server and reflects the updated isRead state.
-        router.refresh();
-      }
-    }).catch(() => null);
+    setIsRead(true);
+    markReadStatus({
+      messageId: message.messageId,
+      isRead: true,
+      address: fromAddress,
+      folder: fromFolder,
+      direction: fromDirection,
+    });
   }, [message.messageId, message.isRead, showReadToggle]);
 
   async function toggleRead() {
@@ -95,12 +103,13 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
     setIsRead(next);
     setIsTogglingRead(true);
     try {
-      await fetch(`/api/messages/${message.messageId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isRead: next }),
+      await markReadStatus({
+        messageId: message.messageId,
+        isRead: next,
+        address: fromAddress,
+        folder: fromFolder,
+        direction: fromDirection,
       });
-      dispatchReadEvent(message.messageId, next);
     } catch {
       setIsRead(!next);
     } finally {
@@ -111,19 +120,19 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
   async function handleMoveToTrash() {
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/messages/${message.messageId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folder: 'trash' }),
+      const result = await moveMessage({
+        messageId: message.messageId,
+        targetFolder: 'trash',
+        fromAddress,
+        fromFolder,
+        fromDirection,
       });
-      if (!res.ok) {
+      if ('error' in result) {
         toast.error('Failed to move message to Trash');
         return;
       }
-      dispatchMessageRemoved(message.messageId);
       toast.success('Moved to Trash');
       router.push(listHref);
-      router.refresh();
     } catch {
       toast.error('Failed to move message to Trash');
     } finally {
@@ -134,14 +143,17 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
   async function handleDelete() {
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/messages/${message.messageId}`, { method: 'DELETE' });
-      if (!res.ok) {
+      const result = await deleteMsg({
+        messageId: message.messageId,
+        address: fromAddress,
+        folder: fromFolder,
+        direction: fromDirection,
+      });
+      if ('error' in result) {
         toast.error('Failed to delete message');
         return;
       }
-      dispatchMessageRemoved(message.messageId);
       router.push(listHref);
-      router.refresh();
     } catch {
       toast.error('Failed to delete message');
     } finally {
@@ -149,26 +161,22 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
     }
   }
 
-  function dispatchMessageRemoved(messageId: string) {
-    window.dispatchEvent(new CustomEvent('hermes:messageremoved', { detail: { messageId } }));
-  }
-
   async function handleRestoreToInbox() {
     setIsRestoring(true);
     try {
-      const res = await fetch(`/api/messages/${message.messageId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folder: 'inbox' }),
+      const result = await moveMessage({
+        messageId: message.messageId,
+        targetFolder: 'inbox',
+        fromAddress,
+        fromFolder,
+        fromDirection,
       });
-      if (!res.ok) {
+      if ('error' in result) {
         toast.error('Failed to restore message');
         return;
       }
-      dispatchMessageRemoved(message.messageId);
       toast.success('Moved to Inbox');
       router.push(listHref);
-      router.refresh();
     } catch {
       toast.error('Failed to restore message');
     } finally {
@@ -179,19 +187,19 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
   async function handleMoveToJunk() {
     setIsMovingToJunk(true);
     try {
-      const res = await fetch(`/api/messages/${message.messageId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folder: 'junk' }),
+      const result = await moveMessage({
+        messageId: message.messageId,
+        targetFolder: 'junk',
+        fromAddress,
+        fromFolder,
+        fromDirection,
       });
-      if (!res.ok) {
+      if ('error' in result) {
         toast.error('Failed to move message to Junk');
         return;
       }
-      dispatchMessageRemoved(message.messageId);
       toast.success('Moved to Junk');
       router.push(listHref);
-      router.refresh();
     } catch {
       toast.error('Failed to move message to Junk');
     } finally {

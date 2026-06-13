@@ -3,6 +3,7 @@
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useGetMessagesQuery } from "@/store/api";
 import {
   Sidebar,
   SidebarContent,
@@ -114,7 +115,7 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
     return map;
   });
 
-  // Increment from WS events (best-effort; overridden by hermes:inboxcount when inbox is open)
+  // Increment from WS events (best-effort; overridden by RTK Query cache when inbox is open)
   useEffect(() => {
     return subscribe((event) => {
       setUnreadCounts((prev) => {
@@ -125,19 +126,21 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
     });
   }, [subscribe]);
 
-  // Accurate count broadcast by MessageList on mount and on every local state change
+  // Derive accurate inbox unread count from RTK Query cache for the selected address
+  const { data: selectedInboxData } = useGetMessagesQuery(
+    { address: selectedAddress ?? '', folder: 'inbox', direction: 'inbound' },
+    { skip: !selectedAddress },
+  );
+
   useEffect(() => {
-    function onInboxCount(e: Event) {
-      const { address: addr, unreadCount } = (e as CustomEvent<{ address: string; unreadCount: number }>).detail;
-      setUnreadCounts((prev) => {
-        const next = new Map(prev);
-        next.set(addr, unreadCount);
-        return next;
-      });
-    }
-    window.addEventListener('hermes:inboxcount', onInboxCount);
-    return () => window.removeEventListener('hermes:inboxcount', onInboxCount);
-  }, []);
+    if (!selectedAddress || !selectedInboxData) return;
+    const count = selectedInboxData.messages.filter((m) => !m.isRead).length;
+    setUnreadCounts((prev) => {
+      const next = new Map(prev);
+      next.set(selectedAddress, count);
+      return next;
+    });
+  }, [selectedInboxData, selectedAddress]);
 
   async function handleCompose() {
     if (!selectedAddress || isComposing || isOnDraftDetailRoute) return;

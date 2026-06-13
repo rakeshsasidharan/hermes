@@ -2,30 +2,22 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { useDispatch } from 'react-redux';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useWs } from '@/components/ws-context';
 import { MailboxCard, formatMailboxDate } from '@/components/mailbox-card';
 import { BulkActionToolbar } from '@/components/bulk-action-toolbar';
-
-interface Attachment {
-  filename: string;
-  s3Key: string;
-}
-
-interface Message {
-  messageId: string;
-  address: string;
-  sender?: string;
-  from?: string;
-  to?: string;
-  direction?: 'inbound' | 'outbound';
-  subject: string;
-  receivedAt: string;
-  isRead: boolean;
-  snippet?: string;
-  attachments?: Attachment[];
-}
+import {
+  useGetMessagesQuery,
+  useLazyGetMessagesQuery,
+  useMarkReadStatusMutation,
+  useMoveMessageMutation,
+  useDeleteMessageMutation,
+  apiSlice,
+  type Message,
+} from '@/store/api';
+import type { AppDispatch } from '@/store';
 
 interface MessageListProps {
   address: string;
@@ -41,15 +33,25 @@ type Filter = 'all' | 'unread';
 export function MessageList({ address, direction, folder, initialMessages, initialNextCursor, folderLabel }: MessageListProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const dispatch = useDispatch<AppDispatch>();
   const { subscribe } = useWs();
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
-  const [nextCursor, setNextCursor] = useState<string | null>(initialNextCursor);
+
+  const { data, isFetching } = useGetMessagesQuery({ address, folder, direction });
+  const [triggerLoadMore, { isFetching: isLoadingMore }] = useLazyGetMessagesQuery();
+  const [markReadStatus] = useMarkReadStatusMutation();
+  const [moveMessage] = useMoveMessageMutation();
+  const [deleteMessage] = useDeleteMessageMutation();
+
+  const messages = data?.messages ?? initialMessages;
+  const nextCursor = data?.nextCursor ?? initialNextCursor;
+  const isLoading = (isFetching || isLoadingMore) && !data;
+
   const [filter, setFilter] = useState<Filter>('all');
-  const [isLoading, setIsLoading] = useState(false);
   const [pendingMessageId, setPendingMessageId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const isInboxFolder = folder === 'inbox' || (!folder && direction === 'inbound');
+  const isSent = direction === 'outbound';
 
   const activeMessageId = (() => {
     const segments = pathname.split('/');
@@ -60,88 +62,54 @@ export function MessageList({ address, direction, folder, initialMessages, initi
     setPendingMessageId(null);
   }, [pathname]);
 
-  // Clear selection when navigating between folders
   useEffect(() => {
     setSelectedIds(new Set());
   }, [folder, direction]);
 
+  // Prepend incoming WS messages directly into the RTK cache
   useEffect(() => {
     if (!isInboxFolder) return;
     return subscribe((event) => {
       if (event.address.toLowerCase() !== address.toLowerCase()) return;
       fetch(`/api/messages/${encodeURIComponent(event.messageId)}`)
         .then((r) => (r.ok ? r.json() : null))
-        .then((data) => {
-          const incoming: Message = data?.message;
+        .then((responseData) => {
+          const incoming: Message = responseData?.message;
           if (!incoming) return;
-          setMessages((prev) => {
-            if (prev.some((m) => m.messageId === incoming.messageId)) return prev;
-            return [incoming, ...prev];
-          });
+          dispatch(
+            apiSlice.util.updateQueryData(
+              'getMessages',
+              { address, folder, direction },
+              (draft) => {
+                if (draft.messages.some((m) => m.messageId === incoming.messageId)) return;
+                draft.messages.unshift(incoming);
+              },
+            ),
+          );
         })
         .catch(() => null);
     });
-  }, [subscribe, address, isInboxFolder]);
+  }, [subscribe, address, isInboxFolder, dispatch, folder, direction]);
 
-  useEffect(() => {
-    function onReadStatus(e: Event) {
-      const { messageId, isRead } = (e as CustomEvent<{ messageId: string; isRead: boolean }>).detail;
-      setMessages((prev) =>
-        prev.map((m) => m.messageId === messageId ? { ...m, isRead } : m),
-      );
+  function handleLoadMore() {
+    if (nextCursor) {
+      triggerLoadMore({ address, folder, direction, cursor: nextCursor });
     }
-    window.addEventListener('hermes:readstatus', onReadStatus);
-    return () => window.removeEventListener('hermes:readstatus', onReadStatus);
-  }, []);
-
-  useEffect(() => {
-    function onMessageRemoved(e: Event) {
-      const { messageId } = (e as CustomEvent<{ messageId: string }>).detail;
-      setMessages((prev) => prev.filter((m) => m.messageId !== messageId));
-    }
-    window.addEventListener('hermes:messageremoved', onMessageRemoved);
-    return () => window.removeEventListener('hermes:messageremoved', onMessageRemoved);
-  }, []);
-
-  useEffect(() => {
-    if (!isInboxFolder) return;
-    const unreadCount = messages.filter((m) => !m.isRead).length;
-    window.dispatchEvent(
-      new CustomEvent('hermes:inboxcount', { detail: { address, unreadCount } }),
-    );
-  }, [messages, address, isInboxFolder]);
-
-  const fetchMessages = useCallback(async (cursor?: string) => {
-    setIsLoading(true);
-    const params = new URLSearchParams({ address });
-    if (folder) {
-      params.set('folder', folder);
-    } else {
-      params.set('direction', direction);
-    }
-    if (cursor) params.set('cursor', cursor);
-
-    try {
-      const res = await fetch(`/api/messages?${params.toString()}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      if (cursor) {
-        setMessages((prev) => [...prev, ...(data.messages ?? [])]);
-      } else {
-        setMessages(data.messages ?? []);
-      }
-      setNextCursor(data.nextCursor ?? null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [address, direction, folder]);
+  }
 
   function handleRowClick(msg: Message) {
     setPendingMessageId(msg.messageId);
     const root = folder ?? (direction === 'outbound' ? 'sent' : 'inbox');
-    if (!isSent && !msg.isRead && (folder === 'inbox' || folder === 'junk' || !folder)) {
-      setMessages((prev) =>
-        prev.map((m) => m.messageId === msg.messageId ? { ...m, isRead: true } : m),
+    if (!isSent && !msg.isRead && isInboxFolder) {
+      dispatch(
+        apiSlice.util.updateQueryData(
+          'getMessages',
+          { address, folder, direction },
+          (draft) => {
+            const m = draft.messages.find((m) => m.messageId === msg.messageId);
+            if (m) m.isRead = true;
+          },
+        ),
       );
     }
     router.push(`/${root}/${encodeURIComponent(address)}/${msg.messageId}`);
@@ -176,139 +144,63 @@ export function MessageList({ address, direction, folder, initialMessages, initi
 
   async function handleBulkDelete() {
     const ids = [...selectedIds];
-    const removed = messages.filter((m) => ids.includes(m.messageId));
-    setMessages((prev) => prev.filter((m) => !selectedIds.has(m.messageId)));
     setSelectedIds(new Set());
     navigateAwayIfNeeded(ids);
 
-    const results = await Promise.allSettled(
+    await Promise.allSettled(
       ids.map((id) =>
         folder === 'trash'
-          ? fetch(`/api/messages/${encodeURIComponent(id)}`, { method: 'DELETE' })
-          : fetch(`/api/messages/${encodeURIComponent(id)}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ folder: 'trash' }),
+          ? deleteMessage({ messageId: id, address, folder, direction })
+          : moveMessage({
+              messageId: id,
+              targetFolder: 'trash',
+              fromAddress: address,
+              fromFolder: folder,
+              fromDirection: direction,
             }),
       ),
     );
-
-    const failed = removed.filter((_, i) => {
-      const r = results[i];
-      return r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok);
-    });
-    if (failed.length > 0) {
-      setMessages((prev) => {
-        const existing = new Set(prev.map((m) => m.messageId));
-        return [...failed.filter((m) => !existing.has(m.messageId)), ...prev];
-      });
-    }
-    router.refresh();
   }
 
   async function handleBulkJunk() {
     const ids = [...selectedIds];
-    const removed = messages.filter((m) => ids.includes(m.messageId));
-    setMessages((prev) => prev.filter((m) => !selectedIds.has(m.messageId)));
     setSelectedIds(new Set());
     navigateAwayIfNeeded(ids);
 
-    const results = await Promise.allSettled(
+    await Promise.allSettled(
       ids.map((id) =>
-        fetch(`/api/messages/${encodeURIComponent(id)}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ folder: 'junk' }),
+        moveMessage({
+          messageId: id,
+          targetFolder: 'junk',
+          fromAddress: address,
+          fromFolder: folder,
+          fromDirection: direction,
         }),
       ),
     );
-
-    const failed = removed.filter((_, i) => {
-      const r = results[i];
-      return r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok);
-    });
-    if (failed.length > 0) {
-      setMessages((prev) => {
-        const existing = new Set(prev.map((m) => m.messageId));
-        return [...failed.filter((m) => !existing.has(m.messageId)), ...prev];
-      });
-    }
-    router.refresh();
   }
 
   async function handleBulkMarkRead() {
     const ids = [...selectedIds];
-    const original = messages.map((m) => ({ id: m.messageId, isRead: m.isRead }));
-    setMessages((prev) =>
-      prev.map((m) => selectedIds.has(m.messageId) ? { ...m, isRead: true } : m),
-    );
     setSelectedIds(new Set());
 
-    const results = await Promise.allSettled(
+    await Promise.allSettled(
       ids.map((id) =>
-        fetch(`/api/messages/${encodeURIComponent(id)}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ isRead: true }),
-        }),
+        markReadStatus({ messageId: id, isRead: true, address, folder, direction }),
       ),
     );
-
-    const failedIds = new Set(
-      ids.filter((_, i) => {
-        const r = results[i];
-        return r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok);
-      }),
-    );
-    if (failedIds.size > 0) {
-      setMessages((prev) =>
-        prev.map((m) => {
-          if (!failedIds.has(m.messageId)) return m;
-          const orig = original.find((o) => o.id === m.messageId);
-          return orig ? { ...m, isRead: orig.isRead } : m;
-        }),
-      );
-    }
-    router.refresh();
   }
 
   async function handleBulkMarkUnread() {
     const ids = [...selectedIds];
-    const original = messages.map((m) => ({ id: m.messageId, isRead: m.isRead }));
-    setMessages((prev) =>
-      prev.map((m) => selectedIds.has(m.messageId) ? { ...m, isRead: false } : m),
-    );
     setSelectedIds(new Set());
 
-    const results = await Promise.allSettled(
+    await Promise.allSettled(
       ids.map((id) =>
-        fetch(`/api/messages/${encodeURIComponent(id)}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ isRead: false }),
-        }),
+        markReadStatus({ messageId: id, isRead: false, address, folder, direction }),
       ),
     );
-
-    const failedIds = new Set(
-      ids.filter((_, i) => {
-        const r = results[i];
-        return r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok);
-      }),
-    );
-    if (failedIds.size > 0) {
-      setMessages((prev) =>
-        prev.map((m) => {
-          if (!failedIds.has(m.messageId)) return m;
-          const orig = original.find((o) => o.id === m.messageId);
-          return orig ? { ...m, isRead: orig.isRead } : m;
-        }),
-      );
-    }
-    router.refresh();
   }
-
-  const isSent = direction === 'outbound';
 
   function extractDisplayName(emailStr: string): string {
     const match = emailStr.match(/^(.+?)\s*<[^>]+>$/);
@@ -405,8 +297,8 @@ export function MessageList({ address, direction, folder, initialMessages, initi
             </div>
             {nextCursor && (
               <div className="flex justify-center py-3">
-                <Button variant="ghost" size="sm" onClick={() => fetchMessages(nextCursor)} disabled={isLoading}>
-                  {isLoading ? 'Loading…' : 'Load more'}
+                <Button variant="ghost" size="sm" onClick={handleLoadMore} disabled={isLoadingMore}>
+                  {isLoadingMore ? 'Loading…' : 'Load more'}
                 </Button>
               </div>
             )}
