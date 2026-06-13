@@ -7,6 +7,14 @@ jest.mock('next/navigation', () => ({
   usePathname: () => '/',
 }));
 
+const mockReplyToMessageFn = jest.fn();
+const mockSendEmailFn = jest.fn();
+
+jest.mock('@/store/api', () => ({
+  useReplyToMessageMutation: jest.fn(() => [mockReplyToMessageFn]),
+  useSendEmailMutation: jest.fn(() => [mockSendEmailFn]),
+}));
+
 const BASE_MESSAGE = {
   messageId: 'msg-1',
   subject: 'Hello there',
@@ -24,6 +32,26 @@ const DEFAULT_PROPS = {
 
 beforeEach(() => {
   global.fetch = jest.fn();
+
+  mockReplyToMessageFn.mockImplementation(async ({ messageId, payload }: { messageId: string; payload: Record<string, unknown> }) => {
+    const res = await (global.fetch as jest.Mock)(
+      `/api/messages/${encodeURIComponent(messageId)}/reply`,
+      { method: 'POST', body: JSON.stringify(payload) },
+    );
+    if (!(res as { ok: boolean }).ok) {
+      const data = await (res as { json: () => Promise<unknown> }).json();
+      return { error: { data } };
+    }
+    return { data: await (res as { json: () => Promise<unknown> }).json() };
+  });
+
+  mockSendEmailFn.mockImplementation(async (payload: Record<string, unknown>) => {
+    const res = await (global.fetch as jest.Mock)(
+      '/api/messages',
+      { method: 'POST', body: JSON.stringify(payload) },
+    );
+    return (res as { ok: boolean }).ok ? { data: {} } : { error: {} };
+  });
 });
 
 afterEach(() => {

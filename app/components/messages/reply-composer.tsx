@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { BookMarked, Paperclip, Send, Trash2, X } from 'lucide-react';
+import { useReplyToMessageMutation, useSendEmailMutation } from '@/store/api';
 
 interface Message {
   messageId: string;
@@ -59,6 +60,9 @@ export function ReplyComposer({
   onClose,
 }: ReplyComposerProps) {
   const router = useRouter();
+  const [replyToMessage] = useReplyToMessageMutation();
+  const [sendEmail] = useSendEmailMutation();
+
   const originalSubject = message.subject ?? '';
 
   const defaultSubject = (() => {
@@ -176,41 +180,38 @@ export function ReplyComposer({
     setIsSending(true);
     setSendError(null);
     try {
-      const endpoint = mode === 'forward'
-        ? '/api/messages'
-        : `/api/messages/${message.messageId}/reply`;
-      const method = 'POST';
-      const bodyPayload = mode === 'forward'
-        ? {
+      let result;
+      if (mode === 'forward') {
+        result = await sendEmail({
+          from: currentAddress,
+          to,
+          cc: cc || undefined,
+          subject: defaultSubject,
+          body,
+          attachmentKeys: attachments.map((a) => a.s3Key),
+          draftId: draftId ?? undefined,
+        });
+      } else {
+        result = await replyToMessage({
+          messageId: message.messageId,
+          payload: {
             from: currentAddress,
             to,
             cc: cc || undefined,
-            subject: defaultSubject,
             body,
             attachmentKeys: attachments.map((a) => a.s3Key),
             draftId: draftId ?? undefined,
-          }
-        : {
-            from: currentAddress,
-            to,
-            cc: cc || undefined,
-            body,
-            attachmentKeys: attachments.map((a) => a.s3Key),
-            draftId: draftId ?? undefined,
-          };
+          },
+        });
+      }
 
-      const res = await fetch(endpoint, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyPayload),
-      });
-      if (!res.ok) {
-        const data = await res.json() as { error?: string };
-        setSendError(data.error ?? 'Failed to send');
+      if ('error' in result) {
+        const errData = result.error as { data?: { error?: string } };
+        setSendError(errData?.data?.error ?? 'Failed to send');
         return;
       }
+
       onClose();
-      router.refresh();
     } catch {
       setSendError('Failed to send. Please try again.');
     } finally {

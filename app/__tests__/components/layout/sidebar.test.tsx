@@ -45,6 +45,13 @@ jest.mock('@/components/ui/tooltip', () => ({
   TooltipContent: () => null,
 }));
 
+// Mock RTK Query hook — sidebar uses this to derive inbox unread count
+jest.mock('@/store/api', () => ({
+  useGetMessagesQuery: jest.fn(() => ({ data: null, isFetching: false })),
+}));
+
+import { useGetMessagesQuery } from '@/store/api';
+
 const ADDRESSES = [
   { email: 'hello@example.com', domain: 'example.com', status: 'active', unreadCount: 3 },
   { email: 'info@example.com', domain: 'example.com', status: 'active', unreadCount: 0 },
@@ -80,6 +87,7 @@ beforeEach(() => {
   mockPush.mockReset();
   wsHandler = null;
   mockSubscribe.mockClear();
+  (useGetMessagesQuery as jest.Mock).mockReturnValue({ data: null, isFetching: false });
 });
 
 afterEach(() => {
@@ -160,10 +168,29 @@ describe('AppSidebar', () => {
     expect(screen.getByTestId('folder-link-sent')).toHaveAttribute('data-active', 'true');
   });
 
-  test('shows unread badge for selected address inbox count', () => {
+  test('shows unread badge from server-rendered initial count', () => {
     mockPathname.mockReturnValue('/inbox/hello%40example.com');
     renderSidebar();
     expect(screen.getByText('3')).toBeInTheDocument();
+  });
+
+  test('updates unread badge when RTK Query inbox data is available', async () => {
+    mockPathname.mockReturnValue('/inbox/hello%40example.com');
+    (useGetMessagesQuery as jest.Mock).mockReturnValue({
+      data: {
+        messages: [
+          { messageId: 'msg-1', isRead: false },
+          { messageId: 'msg-2', isRead: false },
+          { messageId: 'msg-3', isRead: true },
+        ],
+        nextCursor: null,
+      },
+      isFetching: false,
+    });
+    renderSidebar();
+    await waitFor(() => {
+      expect(screen.getByText('2')).toBeInTheDocument();
+    });
   });
 
   test('increments unread badge when WebSocket new_message event arrives', async () => {
@@ -180,22 +207,6 @@ describe('AppSidebar', () => {
 
     await waitFor(() => {
       expect(screen.getByText('1')).toBeInTheDocument();
-    });
-  });
-
-  test('replaces unread badge when hermes:inboxcount fires', async () => {
-    mockPathname.mockReturnValue('/inbox/hello%40example.com');
-    renderSidebar();
-    expect(screen.getByText('3')).toBeInTheDocument();
-
-    act(() => {
-      window.dispatchEvent(
-        new CustomEvent('hermes:inboxcount', { detail: { address: 'hello@example.com', unreadCount: 7 } }),
-      );
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('7')).toBeInTheDocument();
     });
   });
 
@@ -362,23 +373,6 @@ describe('AppSidebar', () => {
       await user.click(screen.getByRole('button', { name: /hello@example.com/i }));
       const items = screen.getAllByRole('menuitem');
       expect(items[0]).not.toHaveTextContent(/^\d+$/);
-    });
-
-    test('updates dropdown badge when hermes:inboxcount fires for a non-selected address', async () => {
-      mockPathname.mockReturnValue('/inbox/hello%40example.com');
-      const user = userEvent.setup();
-      renderSidebar(ADDRESSES);
-
-      act(() => {
-        window.dispatchEvent(
-          new CustomEvent('hermes:inboxcount', { detail: { address: 'info@example.com', unreadCount: 5 } }),
-        );
-      });
-
-      await user.click(screen.getByRole('button', { name: /hello@example.com/i }));
-      const items = screen.getAllByRole('menuitem');
-      const infoItem = items.find((el) => el.textContent?.includes('info@example.com'));
-      expect(infoItem).toHaveTextContent('5');
     });
   });
 
