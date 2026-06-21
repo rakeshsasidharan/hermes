@@ -66,9 +66,11 @@ export async function POST(req: NextRequest) {
   }
 
   let email: string;
+  let displayName: string | undefined;
   try {
     const body = await req.json();
     email = body?.email?.trim().toLowerCase();
+    displayName = typeof body?.displayName === 'string' ? body.displayName.trim() || undefined : undefined;
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
@@ -126,6 +128,7 @@ export async function POST(req: NextRequest) {
     receiptRuleName: ruleName,
     createdAt: now,
     updatedAt: now,
+    ...(displayName ? { displayName } : {}),
   };
 
   await dynamo.send(new PutCommand({ TableName: process.env.ADDRESSES_TABLE!, Item: item }));

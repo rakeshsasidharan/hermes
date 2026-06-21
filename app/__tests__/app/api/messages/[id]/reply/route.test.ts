@@ -48,6 +48,7 @@ import nodemailer from 'nodemailer';
 process.env.MESSAGES_TABLE = 'hermes-messages';
 process.env.DRAFTS_TABLE = 'hermes-drafts';
 process.env.S3_BUCKET = 'hermes-email-store';
+process.env.ADDRESSES_TABLE = 'hermes-addresses';
 
 import { POST } from '@/app/api/messages/[id]/reply/route';
 
@@ -239,5 +240,27 @@ describe('POST /api/messages/:id/reply', () => {
     await POST(makeReq(validBody), { params: makeParams() });
 
     expect(mockSESSend).not.toHaveBeenCalled();
+  });
+
+  test('uses displayName in From header when address has one', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+    mockDynamoSend
+      .mockResolvedValueOnce({ Item: ORIGINAL_MESSAGE })
+      .mockResolvedValueOnce({ Item: { email: 'me@hermes.com', displayName: 'Rakesh Pillai' } })
+      .mockResolvedValue({});
+
+    await POST(makeReq(validBody), { params: makeParams() });
+
+    const sendMailArg = mockSendMail.mock.calls[0][0] as Record<string, unknown>;
+    expect(sendMailArg.from).toBe('"Rakesh Pillai" <me@hermes.com>');
+  });
+
+  test('uses bare email in From header when address has no displayName', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+
+    await POST(makeReq(validBody), { params: makeParams() });
+
+    const sendMailArg = mockSendMail.mock.calls[0][0] as Record<string, unknown>;
+    expect(sendMailArg.from).toBe('me@hermes.com');
   });
 });
