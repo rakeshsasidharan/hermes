@@ -185,10 +185,8 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
   }
 
   function handleAddressSwitch(email: string) {
-    const folder = FOLDERS.find((f) => pathname.startsWith(`/${f.key}/`));
-    const target = folder ? folder.href(email) : `/inbox/${encodeURIComponent(email)}`;
     setSwitchingToAddress(email);
-    tryNavigate(() => router.push(target));
+    tryNavigate(() => router.push(`/inbox/${encodeURIComponent(email)}`));
   }
 
   const activeFolder = FOLDERS.find((f) => pathname.startsWith(`/${f.key}/`))?.key ?? null;

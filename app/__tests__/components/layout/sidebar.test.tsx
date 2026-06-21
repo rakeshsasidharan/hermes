@@ -376,6 +376,41 @@ describe('AppSidebar', () => {
     });
   });
 
+  describe('address switch navigation', () => {
+    test('always navigates to inbox of new address regardless of current folder', async () => {
+      mockPathname.mockReturnValue('/sent/hello%40example.com');
+      const user = userEvent.setup();
+      renderSidebar();
+      await user.click(screen.getByRole('button', { name: /hello@example.com/i }));
+      const items = screen.getAllByRole('menuitem');
+      const infoItem = items.find((el) => el.textContent?.includes('info@example.com'));
+      await user.click(infoItem!);
+      expect(mockPush).toHaveBeenCalledWith(`/inbox/${encodeURIComponent('info@example.com')}`);
+    });
+
+    test('navigates to inbox when switching from inbox of another address', async () => {
+      mockPathname.mockReturnValue('/inbox/hello%40example.com');
+      const user = userEvent.setup();
+      renderSidebar();
+      await user.click(screen.getByRole('button', { name: /hello@example.com/i }));
+      const items = screen.getAllByRole('menuitem');
+      const infoItem = items.find((el) => el.textContent?.includes('info@example.com'));
+      await user.click(infoItem!);
+      expect(mockPush).toHaveBeenCalledWith(`/inbox/${encodeURIComponent('info@example.com')}`);
+    });
+
+    test('navigates to inbox when switching from drafts folder', async () => {
+      mockPathname.mockReturnValue('/drafts/hello%40example.com');
+      const user = userEvent.setup();
+      renderSidebar();
+      await user.click(screen.getByRole('button', { name: /hello@example.com/i }));
+      const items = screen.getAllByRole('menuitem');
+      const infoItem = items.find((el) => el.textContent?.includes('info@example.com'));
+      await user.click(infoItem!);
+      expect(mockPush).toHaveBeenCalledWith(`/inbox/${encodeURIComponent('info@example.com')}`);
+    });
+  });
+
   describe('options dropdown', () => {
     test('shows Options trigger button', () => {
       renderSidebar();
