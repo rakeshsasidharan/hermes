@@ -125,7 +125,7 @@ const DOMAINS = [
 ];
 
 const ADDRESSES = [
-  { email: 'hello@example.com', domain: 'example.com', status: 'active', createdAt: '2024-01-01T00:00:00Z' },
+  { email: 'hello@example.com', domain: 'example.com', status: 'active', createdAt: '2024-01-01T00:00:00Z', displayName: 'Rakesh Pillai' },
   { email: 'info@example.com', domain: 'example.com', status: 'active', createdAt: '2024-01-02T00:00:00Z' },
 ];
 
@@ -331,6 +331,73 @@ describe('SettingsView', () => {
       );
       renderView();
       expect(screen.getByTestId('sidebar-default-select')).toBeInTheDocument();
+    });
+  });
+
+  describe('address display name', () => {
+    test('shows existing displayName when set', async () => {
+      const user = userEvent.setup();
+      renderView();
+      await user.click(screen.getByTestId('domain-row-example.com'));
+      expect(screen.getByTestId('display-name-hello@example.com')).toHaveTextContent('Rakesh Pillai');
+    });
+
+    test('shows "No display name" when displayName is not set', async () => {
+      const user = userEvent.setup();
+      renderView();
+      await user.click(screen.getByTestId('domain-row-example.com'));
+      expect(screen.getByTestId('display-name-info@example.com')).toHaveTextContent('No display name');
+    });
+
+    test('clicking edit shows input pre-filled with current displayName', async () => {
+      const user = userEvent.setup();
+      renderView();
+      await user.click(screen.getByTestId('domain-row-example.com'));
+      await user.click(screen.getByTestId('display-name-edit-hello@example.com'));
+      const input = screen.getByTestId('display-name-input-hello@example.com');
+      expect(input).toBeInTheDocument();
+      expect(input).toHaveValue('Rakesh Pillai');
+    });
+
+    test('clicking edit for address with no name shows empty input', async () => {
+      const user = userEvent.setup();
+      renderView();
+      await user.click(screen.getByTestId('domain-row-example.com'));
+      await user.click(screen.getByTestId('display-name-edit-info@example.com'));
+      const input = screen.getByTestId('display-name-input-info@example.com');
+      expect(input).toHaveValue('');
+    });
+
+    test('save calls PATCH with new displayName and updates UI', async () => {
+      const user = userEvent.setup();
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: true });
+      renderView();
+      await user.click(screen.getByTestId('domain-row-example.com'));
+      await user.click(screen.getByTestId('display-name-edit-info@example.com'));
+      await user.clear(screen.getByTestId('display-name-input-info@example.com'));
+      await user.type(screen.getByTestId('display-name-input-info@example.com'), 'New Name');
+      await user.click(screen.getByTestId('display-name-save-info@example.com'));
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/addresses/${encodeURIComponent('info@example.com')}`,
+        expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ displayName: 'New Name' }) }),
+      );
+      await waitFor(() => {
+        expect(screen.getByTestId('display-name-info@example.com')).toHaveTextContent('New Name');
+      });
+    });
+
+    test('cancel reverts input without calling fetch', async () => {
+      const user = userEvent.setup();
+      renderView();
+      await user.click(screen.getByTestId('domain-row-example.com'));
+      await user.click(screen.getByTestId('display-name-edit-hello@example.com'));
+      await user.clear(screen.getByTestId('display-name-input-hello@example.com'));
+      await user.type(screen.getByTestId('display-name-input-hello@example.com'), 'Changed Name');
+      await user.click(screen.getByTestId('display-name-cancel-hello@example.com'));
+
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(screen.getByTestId('display-name-hello@example.com')).toHaveTextContent('Rakesh Pillai');
     });
   });
 

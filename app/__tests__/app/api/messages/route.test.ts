@@ -19,6 +19,7 @@ jest.mock('@aws-sdk/client-dynamodb', () => ({
 
 jest.mock('@aws-sdk/lib-dynamodb', () => ({
   DynamoDBDocumentClient: { from: jest.fn().mockImplementation(() => ({ send: mockDynamoSend })) },
+  GetCommand: jest.fn((p: unknown) => p),
   QueryCommand: jest.fn((p: unknown) => p),
   PutCommand: jest.fn((p: unknown) => p),
   DeleteCommand: jest.fn((p: unknown) => p),
@@ -48,6 +49,7 @@ import nodemailer from 'nodemailer';
 process.env.MESSAGES_TABLE = 'hermes-messages';
 process.env.DRAFTS_TABLE = 'hermes-drafts';
 process.env.S3_BUCKET = 'hermes-email-store';
+process.env.ADDRESSES_TABLE = 'hermes-addresses';
 
 import { GET, POST } from '@/app/api/messages/route';
 
@@ -360,9 +362,11 @@ describe('POST /api/messages', () => {
 
     await POST(makePostReq(validBody));
 
-    const putArg = (mockDynamoSend.mock.calls[0] as [Record<string, unknown>])[0] as Record<string, unknown>;
-    const item = putArg.Item as Record<string, unknown>;
-    expect(putArg.TableName).toBe('hermes-messages');
+    const calls = mockDynamoSend.mock.calls as [Record<string, unknown>][];
+    const putArg = calls.find(([c]) => (c as Record<string, unknown>).Item) as [Record<string, unknown>] | undefined;
+    expect(putArg).toBeDefined();
+    const item = (putArg![0] as Record<string, unknown>).Item as Record<string, unknown>;
+    expect((putArg![0] as Record<string, unknown>).TableName).toBe('hermes-messages');
     expect(item.direction).toBe('outbound');
     expect(item.from).toBe('me@hermes.com');
     expect(item.to).toBe('recipient@example.com');
@@ -377,8 +381,10 @@ describe('POST /api/messages', () => {
 
     await POST(makePostReq({ ...validBody, body: longBody }));
 
-    const putArg = (mockDynamoSend.mock.calls[0] as [Record<string, unknown>])[0] as Record<string, unknown>;
-    const item = putArg.Item as Record<string, unknown>;
+    const calls = mockDynamoSend.mock.calls as [Record<string, unknown>][];
+    const putArg = calls.find(([c]) => (c as Record<string, unknown>).Item) as [Record<string, unknown>] | undefined;
+    expect(putArg).toBeDefined();
+    const item = (putArg![0] as Record<string, unknown>).Item as Record<string, unknown>;
     expect(typeof item.snippet).toBe('string');
     expect((item.snippet as string).length).toBe(300);
   });
@@ -403,9 +409,13 @@ describe('POST /api/messages', () => {
 
     await POST(makePostReq({ ...validBody, draftId: 'draft-abc' }));
 
-    const deleteArg = (mockDynamoSend.mock.calls[1] as [Record<string, unknown>])[0] as Record<string, unknown>;
-    expect(deleteArg.TableName).toBe('hermes-drafts');
-    expect((deleteArg.Key as Record<string, unknown>).draftId).toBe('draft-abc');
+    const calls = mockDynamoSend.mock.calls as [Record<string, unknown>][];
+    const deleteArg = calls.find(
+      ([c]) => ((c as Record<string, unknown>).Key as Record<string, unknown>)?.draftId !== undefined,
+    ) as [Record<string, unknown>] | undefined;
+    expect(deleteArg).toBeDefined();
+    expect((deleteArg![0] as Record<string, unknown>).TableName).toBe('hermes-drafts');
+    expect(((deleteArg![0] as Record<string, unknown>).Key as Record<string, unknown>).draftId).toBe('draft-abc');
   });
 
   test('does not call delete when no draftId', async () => {
@@ -413,7 +423,32 @@ describe('POST /api/messages', () => {
 
     await POST(makePostReq(validBody));
 
-    expect(mockDynamoSend).toHaveBeenCalledTimes(1);
+    const calls = mockDynamoSend.mock.calls as [Record<string, unknown>][];
+    const deleteArg = calls.find(
+      ([c]) => ((c as Record<string, unknown>).Key as Record<string, unknown>)?.draftId !== undefined,
+    );
+    expect(deleteArg).toBeUndefined();
+  });
+
+  test('uses displayName in From header when address has one', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+    mockDynamoSend
+      .mockResolvedValueOnce({ Item: { email: 'me@hermes.com', displayName: 'Rakesh Pillai' } })
+      .mockResolvedValue({});
+
+    await POST(makePostReq(validBody));
+
+    const sendMailArg = mockSendMail.mock.calls[0][0] as Record<string, unknown>;
+    expect(sendMailArg.from).toBe('"Rakesh Pillai" <me@hermes.com>');
+  });
+
+  test('uses bare email in From header when address has no displayName', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+
+    await POST(makePostReq(validBody));
+
+    const sendMailArg = mockSendMail.mock.calls[0][0] as Record<string, unknown>;
+    expect(sendMailArg.from).toBe('me@hermes.com');
   });
 
   test('returns 400 when required fields are missing', async () => {

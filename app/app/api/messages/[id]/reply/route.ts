@@ -10,6 +10,21 @@ function getDynamo() {
   return DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.AWS_REGION ?? 'us-east-1' }));
 }
 
+async function buildFromHeader(email: string): Promise<string> {
+  try {
+    const dynamo = getDynamo();
+    const result = await dynamo.send(new GetCommand({
+      TableName: process.env.ADDRESSES_TABLE!,
+      Key: { email },
+    }));
+    const displayName = result.Item?.displayName as string | undefined;
+    if (displayName) return `"${displayName}" <${email}>`;
+  } catch {
+    // fall through to bare email on any lookup error
+  }
+  return email;
+}
+
 function getS3() {
   return new S3Client({ region: process.env.AWS_REGION ?? 'us-east-1' });
 }
@@ -81,9 +96,10 @@ export async function POST(
     }
   }
 
+  const fromHeader = await buildFromHeader(from as string);
   const transporter = nodemailer.createTransport({ streamTransport: true, newline: 'unix', buffer: true });
   const info = await transporter.sendMail({
-    from: from as string,
+    from: fromHeader,
     to: to as string,
     ...(cc ? { cc: cc as string } : {}),
     ...(bcc ? { bcc: bcc as string } : {}),

@@ -35,7 +35,7 @@ import { requireAuth, AuthError } from '@/lib/auth/require-auth';
 process.env.ADDRESSES_TABLE = 'hermes-addresses';
 process.env.SES_RULE_SET_NAME = 'hermes-receipt-rules';
 
-import { DELETE } from '@/app/api/addresses/[email]/route';
+import { DELETE, PATCH } from '@/app/api/addresses/[email]/route';
 
 const mockRequireAuth = requireAuth as jest.Mock;
 
@@ -51,6 +51,14 @@ const ACTIVE_ITEM = {
 function makeDeleteReq(email: string) {
   return new NextRequest(`http://localhost/api/addresses/${encodeURIComponent(email)}`, {
     method: 'DELETE',
+  });
+}
+
+function makePatchReq(email: string, body: Record<string, unknown>) {
+  return new NextRequest(`http://localhost/api/addresses/${encodeURIComponent(email)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   });
 }
 
@@ -164,5 +172,128 @@ describe('DELETE /api/addresses/:email', () => {
       ([cmd]) => 'Identity' in cmd,
     )?.[0];
     expect(identityCall).toMatchObject({ Identity: 'hello@example.com' });
+  });
+});
+
+// ── PATCH /api/addresses/:email ─────────────────────────────────────────────
+
+describe('PATCH /api/addresses/:email', () => {
+  test('returns 200 with updated address when displayName is set', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+    mockDynamoSend.mockResolvedValueOnce({ Item: ACTIVE_ITEM });
+    mockDynamoSend.mockResolvedValueOnce({});
+
+    const res = await PATCH(
+      makePatchReq('hello@example.com', { displayName: 'Rakesh Pillai' }),
+      makeParams('hello@example.com'),
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.address.displayName).toBe('Rakesh Pillai');
+    expect(body.address.email).toBe('hello@example.com');
+  });
+
+  test('allows clearing displayName with empty string', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+    mockDynamoSend.mockResolvedValueOnce({ Item: { ...ACTIVE_ITEM, displayName: 'Old Name' } });
+    mockDynamoSend.mockResolvedValueOnce({});
+
+    const res = await PATCH(
+      makePatchReq('hello@example.com', { displayName: '' }),
+      makeParams('hello@example.com'),
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.address.displayName).toBe('');
+  });
+
+  test('writes displayName to DynamoDB via UpdateCommand', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+    mockDynamoSend.mockResolvedValueOnce({ Item: ACTIVE_ITEM });
+    mockDynamoSend.mockResolvedValueOnce({});
+
+    await PATCH(
+      makePatchReq('hello@example.com', { displayName: 'Rakesh Pillai' }),
+      makeParams('hello@example.com'),
+    );
+
+    const updateCall = (mockDynamoSend.mock.calls as Array<[Record<string, unknown>]>).find(
+      ([cmd]) => 'UpdateExpression' in cmd,
+    )?.[0];
+    expect(updateCall).toMatchObject({
+      TableName: 'hermes-addresses',
+      Key: { email: 'hello@example.com' },
+      ExpressionAttributeValues: expect.objectContaining({ ':dn': 'Rakesh Pillai' }),
+    });
+  });
+
+  test('returns 400 when displayName field is missing from body', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+
+    const res = await PATCH(
+      makePatchReq('hello@example.com', {}),
+      makeParams('hello@example.com'),
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain('displayName');
+  });
+
+  test('returns 404 for non-existent address', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+    mockDynamoSend.mockResolvedValueOnce({ Item: undefined });
+
+    const res = await PATCH(
+      makePatchReq('ghost@example.com', { displayName: 'Ghost' }),
+      makeParams('ghost@example.com'),
+    );
+
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toBe('Address not found');
+  });
+
+  test('returns 404 for soft-deleted address', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+    mockDynamoSend.mockResolvedValueOnce({ Item: { ...ACTIVE_ITEM, status: 'deleted' } });
+
+    const res = await PATCH(
+      makePatchReq('hello@example.com', { displayName: 'Name' }),
+      makeParams('hello@example.com'),
+    );
+
+    expect(res.status).toBe(404);
+  });
+
+  test('returns 401 for unauthenticated request', async () => {
+    mockRequireAuth.mockRejectedValue(new AuthError('Missing authentication token', 401));
+
+    const res = await PATCH(
+      makePatchReq('hello@example.com', { displayName: 'Name' }),
+      makeParams('hello@example.com'),
+    );
+
+    expect(res.status).toBe(401);
+  });
+
+  test('trims whitespace from displayName', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+    mockDynamoSend.mockResolvedValueOnce({ Item: ACTIVE_ITEM });
+    mockDynamoSend.mockResolvedValueOnce({});
+
+    await PATCH(
+      makePatchReq('hello@example.com', { displayName: '  Rakesh  ' }),
+      makeParams('hello@example.com'),
+    );
+
+    const updateCall = (mockDynamoSend.mock.calls as Array<[Record<string, unknown>]>).find(
+      ([cmd]) => 'UpdateExpression' in cmd,
+    )?.[0];
+    expect(updateCall).toMatchObject({
+      ExpressionAttributeValues: expect.objectContaining({ ':dn': 'Rakesh' }),
+    });
   });
 });

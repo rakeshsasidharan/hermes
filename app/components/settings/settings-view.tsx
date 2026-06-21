@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -22,6 +23,9 @@ import {
   Plus,
   KeyRound,
   SlidersHorizontal,
+  Pencil,
+  Check,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AddDomainDialog } from '@/components/domains/add-domain-dialog';
@@ -46,6 +50,7 @@ interface Address {
   domain: string;
   status: string;
   createdAt: string;
+  displayName?: string;
 }
 
 interface Message {
@@ -278,31 +283,16 @@ export function SettingsView({
                         ) : (
                           <ul className="divide-y" data-testid={`address-list-${d.domain}`}>
                             {domainAddresses.map((addr) => (
-                              <li
+                              <AddressRow
                                 key={addr.email}
-                                className="flex items-center justify-between py-3"
-                              >
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <AtSign className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                                  <span className="text-sm truncate">{addr.email}</span>
-                                  <Badge
-                                    variant={addr.status === 'active' ? 'default' : 'secondary'}
-                                    className="text-xs shrink-0"
-                                  >
-                                    {addr.status}
-                                  </Badge>
-                                  <span className="text-xs text-muted-foreground shrink-0">
-                                    Added {new Date(addr.createdAt).toLocaleDateString()}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-1 shrink-0">
-                                  <ApiKeysDialog email={addr.email} />
-                                  <DeleteAddressDialog
-                                    email={addr.email}
-                                    onSuccess={() => handleAddressDeleted(addr.email)}
-                                  />
-                                </div>
-                              </li>
+                                addr={addr}
+                                onDisplayNameSaved={(dn) =>
+                                  setAddresses((prev) =>
+                                    prev.map((a) => a.email === addr.email ? { ...a, displayName: dn } : a),
+                                  )
+                                }
+                                onDeleted={() => handleAddressDeleted(addr.email)}
+                              />
                             ))}
                           </ul>
                         )}
@@ -473,6 +463,127 @@ export function SettingsView({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+interface AddressRowProps {
+  addr: Address;
+  onDisplayNameSaved: (displayName: string) => void;
+  onDeleted: () => void;
+}
+
+function AddressRow({ addr, onDisplayNameSaved, onDeleted }: AddressRowProps) {
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState(addr.displayName ?? '');
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/addresses/${encodeURIComponent(addr.email)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ displayName: editValue.trim() }),
+      });
+      if (res.ok) {
+        onDisplayNameSaved(editValue.trim());
+        setEditing(false);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleCancel() {
+    setEditValue(addr.displayName ?? '');
+    setEditing(false);
+  }
+
+  return (
+    <li
+      key={addr.email}
+      className="flex items-start justify-between py-3 gap-2"
+    >
+      <div className="flex flex-col gap-1 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <AtSign className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <span className="text-sm truncate">{addr.email}</span>
+          <Badge
+            variant={addr.status === 'active' ? 'default' : 'secondary'}
+            className="text-xs shrink-0"
+          >
+            {addr.status}
+          </Badge>
+          <span className="text-xs text-muted-foreground shrink-0">
+            Added {new Date(addr.createdAt).toLocaleDateString()}
+          </span>
+        </div>
+
+        {editing ? (
+          <div className="flex items-center gap-1 pl-5">
+            <Input
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              placeholder="Display name (e.g. Rakesh Pillai)"
+              className="h-7 text-xs w-56"
+              disabled={saving}
+              autoFocus
+              data-testid={`display-name-input-${addr.email}`}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSave();
+                if (e.key === 'Escape') handleCancel();
+              }}
+            />
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6 shrink-0 text-green-600 hover:text-green-700"
+              onClick={handleSave}
+              disabled={saving}
+              aria-label="Save display name"
+              data-testid={`display-name-save-${addr.email}`}
+            >
+              <Check className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6 shrink-0"
+              onClick={handleCancel}
+              disabled={saving}
+              aria-label="Cancel"
+              data-testid={`display-name-cancel-${addr.email}`}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 pl-5">
+            <span
+              className="text-xs text-muted-foreground"
+              data-testid={`display-name-${addr.email}`}
+            >
+              {addr.displayName ? addr.displayName : 'No display name'}
+            </span>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-5 w-5 shrink-0"
+              onClick={() => setEditing(true)}
+              aria-label="Edit display name"
+              data-testid={`display-name-edit-${addr.email}`}
+            >
+              <Pencil className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center gap-1 shrink-0">
+        <ApiKeysDialog email={addr.email} />
+        <DeleteAddressDialog email={addr.email} onSuccess={onDeleted} />
+      </div>
+    </li>
   );
 }
 

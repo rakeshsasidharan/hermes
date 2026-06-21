@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, QueryCommand, PutCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, QueryCommand, PutCommand, DeleteCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { requireAuth, AuthError } from '@/lib/auth/require-auth';
@@ -8,6 +8,21 @@ import nodemailer from 'nodemailer';
 
 function getDynamo() {
   return DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.AWS_REGION ?? 'us-east-1' }));
+}
+
+async function buildFromHeader(email: string): Promise<string> {
+  try {
+    const dynamo = getDynamo();
+    const result = await dynamo.send(new GetCommand({
+      TableName: process.env.ADDRESSES_TABLE!,
+      Key: { email },
+    }));
+    const displayName = result.Item?.displayName as string | undefined;
+    if (displayName) return `"${displayName}" <${email}>`;
+  } catch {
+    // fall through to bare email on any lookup error
+  }
+  return email;
 }
 
 function getS3() {
@@ -176,9 +191,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const fromHeader = await buildFromHeader(from as string);
   const transporter = nodemailer.createTransport({ streamTransport: true, newline: 'unix', buffer: true });
   const info = await transporter.sendMail({
-    from: from as string,
+    from: fromHeader,
     to: to as string,
     ...(cc ? { cc: cc as string } : {}),
     ...(bcc ? { bcc: bcc as string } : {}),
