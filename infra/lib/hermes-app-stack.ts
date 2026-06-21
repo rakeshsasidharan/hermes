@@ -70,6 +70,7 @@ export class HermesAppStack extends cdk.Stack {
       sid: 'SesPermissions',
       actions: [
         'ses:SendEmail',
+        'ses:SendRawEmail',
         'ses:ListIdentities',
         'ses:CreateEmailIdentity',
         'ses:DeleteEmailIdentity',
