@@ -116,19 +116,6 @@ export const apiSlice = createApi({
         method: 'POST',
         body: payload,
       }),
-      async onQueryStarted({ draftId, from }, { dispatch, queryFulfilled }) {
-        if (!draftId) return;
-        const patchResult = dispatch(
-          apiSlice.util.updateQueryData('getDrafts', from, (draft) => {
-            draft.drafts = draft.drafts.filter((d) => d.draftId !== draftId);
-          }),
-        );
-        try {
-          await queryFulfilled;
-        } catch {
-          patchResult.undo();
-        }
-      },
       invalidatesTags: (_result, error) => (error ? [] : ['Draft']),
     }),
     getMessages: builder.query<GetMessagesResponse, GetMessagesArgs>({

@@ -143,8 +143,17 @@ export function ComposeEditor({ draft, address }: ComposeEditorProps) {
         body,
         draftId: draft.draftId,
       }).unwrap();
-      shouldDeleteOnNavigateRef.current = false; // API already deleted the draft
+      shouldDeleteOnNavigateRef.current = false;
+      // Navigate and remove draft from list in the same synchronous tick so
+      // the compose editor closes at the same time the draft disappears.
       router.push(`/drafts/${encodeURIComponent(address)}`);
+      if (draft.draftId) {
+        dispatch(
+          apiSlice.util.updateQueryData('getDrafts', address, (d) => {
+            d.drafts = d.drafts.filter((x) => x.draftId !== draft.draftId);
+          }),
+        );
+      }
     } catch (err) {
       const message = (err as { data?: { error?: string } })?.data?.error;
       setSendError(message ?? 'Failed to send email. Please try again.');

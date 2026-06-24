@@ -16,11 +16,13 @@ jest.mock('next/navigation', () => ({
 const mockSendEmailUnwrap = jest.fn().mockResolvedValue({ messageId: 'new-msg' });
 const mockSendEmail = jest.fn(() => ({ unwrap: mockSendEmailUnwrap }));
 const mockInvalidateTags = jest.fn(() => ({ type: 'test/invalidate' }));
+const mockUpdateQueryData = jest.fn(() => ({ type: 'test/update' }));
 jest.mock('@/store/api', () => ({
   useSendEmailMutation: () => [mockSendEmail],
   apiSlice: {
     util: {
       invalidateTags: (...args: unknown[]) => mockInvalidateTags(...args),
+      updateQueryData: (...args: unknown[]) => mockUpdateQueryData(...args),
     },
   },
 }));
@@ -71,6 +73,7 @@ beforeEach(() => {
   mockSendEmail.mockClear();
   mockSendEmailUnwrap.mockClear();
   mockInvalidateTags.mockClear();
+  mockUpdateQueryData.mockClear();
 });
 
 afterEach(() => {
@@ -188,6 +191,37 @@ describe('ComposeEditor', () => {
           `/drafts/${encodeURIComponent('me@hermes.com')}`,
         );
       });
+    });
+
+    test('dispatches cache update and navigates in same tick after send succeeds', async () => {
+      const user = userEvent.setup();
+      render(<ComposeEditor draft={DRAFT} address="me@hermes.com" />);
+
+      await user.click(screen.getByTestId('compose-send-button'));
+
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith(`/drafts/${encodeURIComponent('me@hermes.com')}`);
+        expect(mockUpdateQueryData).toHaveBeenCalledWith(
+          'getDrafts',
+          'me@hermes.com',
+          expect.any(Function),
+        );
+      });
+      // Both must have been dispatched — navigation and cache update together
+      expect(mockDispatch).toHaveBeenCalledWith({ type: 'test/update' });
+    });
+
+    test('does not dispatch cache update when send fails', async () => {
+      mockSendEmailUnwrap.mockRejectedValueOnce({ data: { error: 'Send failed' } });
+      const user = userEvent.setup();
+      render(<ComposeEditor draft={DRAFT} address="me@hermes.com" />);
+
+      await user.click(screen.getByTestId('compose-send-button'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('compose-send-error')).toBeInTheDocument();
+      });
+      expect(mockUpdateQueryData).not.toHaveBeenCalled();
     });
 
     test('shows error when send fails', async () => {
