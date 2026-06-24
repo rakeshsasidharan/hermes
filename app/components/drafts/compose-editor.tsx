@@ -118,6 +118,7 @@ export function ComposeEditor({ draft, address }: ComposeEditorProps) {
       setSavedAt(new Date());
       setSaveStatus('saved');
       shouldDeleteOnNavigateRef.current = false;
+      dispatch(apiSlice.util.invalidateTags(['Draft']));
     } catch {
       setSaveStatus('idle');
     }

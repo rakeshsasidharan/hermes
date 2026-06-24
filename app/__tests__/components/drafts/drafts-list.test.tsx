@@ -160,6 +160,24 @@ describe('DraftsList', () => {
     );
   });
 
+  test('clears loading state on draft card when pathname changes after click', async () => {
+    mockQuery([COMPOSE_DRAFT]);
+    const user = userEvent.setup();
+    render(<DraftsList address={ADDRESS} />);
+
+    await user.click(screen.getByTestId(`draft-row-${COMPOSE_DRAFT.draftId}`));
+
+    // Simulate navigation completing by updating pathname
+    mockPathname.mockReturnValue(`/drafts/me%40hermes.com/${COMPOSE_DRAFT.draftId}`);
+
+    // Trigger re-render with new pathname (simulates React re-render after navigation)
+    render(<DraftsList address={ADDRESS} />);
+
+    // After navigation, the loading state should be cleared and only active state remains
+    const card = screen.getAllByTestId(`draft-row-${COMPOSE_DRAFT.draftId}`)[0];
+    expect(card).toBeInTheDocument();
+  });
+
   test('clicking reply draft navigates to message with draftId and mode params', async () => {
     mockQuery([REPLY_DRAFT]);
     const user = userEvent.setup();

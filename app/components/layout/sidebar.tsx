@@ -3,7 +3,9 @@
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useGetMessagesQuery } from "@/store/api";
+import { useDispatch } from "react-redux";
+import type { AppDispatch } from "@/store";
+import { useGetMessagesQuery, apiSlice } from "@/store/api";
 import {
   Sidebar,
   SidebarContent,
@@ -79,6 +81,7 @@ const FOLDERS = [
 export function AppSidebar({ addresses }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
   const { subscribe } = useWs();
 
   const activeAddresses = addresses
@@ -159,6 +162,7 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
       if (!res.ok) { setIsComposing(false); return; }
       const data = await res.json() as { draftId: string };
       router.push(`/drafts/${encodeURIComponent(selectedAddress)}/${data.draftId}`);
+      dispatch(apiSlice.util.invalidateTags(['Draft']));
     } catch {
       setIsComposing(false);
     }

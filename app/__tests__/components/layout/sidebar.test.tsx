@@ -45,9 +45,21 @@ jest.mock('@/components/ui/tooltip', () => ({
   TooltipContent: () => null,
 }));
 
+const mockSidebarDispatch = jest.fn((action) => action);
+jest.mock('react-redux', () => ({
+  useDispatch: () => mockSidebarDispatch,
+}));
+
+const mockSidebarInvalidateTags = jest.fn(() => ({ type: 'test/invalidate' }));
+
 // Mock RTK Query hook — sidebar uses this to derive inbox unread count
 jest.mock('@/store/api', () => ({
   useGetMessagesQuery: jest.fn(() => ({ data: null, isFetching: false })),
+  apiSlice: {
+    util: {
+      invalidateTags: (...args: unknown[]) => mockSidebarInvalidateTags(...args),
+    },
+  },
 }));
 
 import { useGetMessagesQuery } from '@/store/api';
@@ -85,6 +97,8 @@ beforeEach(() => {
   global.fetch = jest.fn();
   mockPathname.mockReturnValue('/');
   mockPush.mockReset();
+  mockSidebarDispatch.mockClear();
+  mockSidebarInvalidateTags.mockClear();
   wsHandler = null;
   mockSubscribe.mockClear();
   (useGetMessagesQuery as jest.Mock).mockReturnValue({ data: null, isFetching: false });
@@ -294,6 +308,41 @@ describe('AppSidebar', () => {
         `/drafts/${encodeURIComponent('hello@example.com')}/new-draft-id`,
       );
     });
+  });
+
+  test('Compose button invalidates Draft cache after creating new draft', async () => {
+    mockPathname.mockReturnValue('/inbox/hello%40example.com');
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ drafts: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ draftId: 'new-draft-id' }) });
+    const user = userEvent.setup();
+    renderSidebar();
+
+    await user.click(screen.getByTestId('compose-button'));
+
+    await waitFor(() => {
+      expect(mockSidebarInvalidateTags).toHaveBeenCalledWith(['Draft']);
+      expect(mockSidebarDispatch).toHaveBeenCalledWith({ type: 'test/invalidate' });
+    });
+  });
+
+  test('Compose button does not invalidate Draft cache when opening existing draft', async () => {
+    mockPathname.mockReturnValue('/inbox/hello%40example.com');
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ drafts: [{ draftId: 'existing-draft', inReplyToMessageId: undefined }] }),
+    });
+    const user = userEvent.setup();
+    renderSidebar();
+
+    await user.click(screen.getByTestId('compose-button'));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith(
+        `/drafts/${encodeURIComponent('hello@example.com')}/existing-draft`,
+      );
+    });
+    expect(mockSidebarInvalidateTags).not.toHaveBeenCalled();
   });
 
   test('Compose button is disabled when on a draft detail route', () => {
