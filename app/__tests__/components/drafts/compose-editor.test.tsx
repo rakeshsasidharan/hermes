@@ -137,6 +137,19 @@ describe('ComposeEditor', () => {
         expect(screen.getByTestId('save-status-saved')).toBeInTheDocument();
       });
     });
+
+    test('invalidates Draft cache after successful save', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: true });
+      const user = userEvent.setup();
+      render(<ComposeEditor draft={DRAFT} address="me@hermes.com" />);
+
+      await user.click(screen.getByTestId('compose-save-draft-button'));
+
+      await waitFor(() => {
+        expect(mockInvalidateTags).toHaveBeenCalledWith(['Draft']);
+        expect(mockDispatch).toHaveBeenCalledWith({ type: 'test/invalidate' });
+      });
+    });
   });
 
   describe('Send', () => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { FileText, Loader2 } from 'lucide-react';
 import { MailboxCard, formatMailboxDate } from '@/components/mailbox-card';
@@ -23,6 +23,10 @@ export function DraftsList({ address }: DraftsListProps) {
 
   const { data, isLoading } = useGetDraftsQuery(address);
   const drafts = data?.drafts ?? [];
+
+  useEffect(() => {
+    setPendingDraftId(null);
+  }, [pathname]);
 
   const activeDraftId = (() => {
     const segments = pathname.split('/');
