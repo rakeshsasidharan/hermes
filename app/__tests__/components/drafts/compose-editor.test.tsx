@@ -206,7 +206,7 @@ describe('ComposeEditor', () => {
       });
     });
 
-    test('dispatches cache update and navigates in same tick after send succeeds', async () => {
+    test('does not synchronously update cache on send — relies on invalidatesTags refetch', async () => {
       const user = userEvent.setup();
       render(<ComposeEditor draft={DRAFT} address="me@hermes.com" />);
 
@@ -214,26 +214,9 @@ describe('ComposeEditor', () => {
 
       await waitFor(() => {
         expect(mockPush).toHaveBeenCalledWith(`/drafts/${encodeURIComponent('me@hermes.com')}`);
-        expect(mockUpdateQueryData).toHaveBeenCalledWith(
-          'getDrafts',
-          'me@hermes.com',
-          expect.any(Function),
-        );
       });
-      // Both must have been dispatched — navigation and cache update together
-      expect(mockDispatch).toHaveBeenCalledWith({ type: 'test/update' });
-    });
-
-    test('does not dispatch cache update when send fails', async () => {
-      mockSendEmailUnwrap.mockRejectedValueOnce({ data: { error: 'Send failed' } });
-      const user = userEvent.setup();
-      render(<ComposeEditor draft={DRAFT} address="me@hermes.com" />);
-
-      await user.click(screen.getByTestId('compose-send-button'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('compose-send-error')).toBeInTheDocument();
-      });
+      // updateQueryData must NOT be called — that would update the list synchronously
+      // before navigation completes, making the draft disappear before the editor closes.
       expect(mockUpdateQueryData).not.toHaveBeenCalled();
     });
 
