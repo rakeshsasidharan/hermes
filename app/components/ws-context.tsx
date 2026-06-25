@@ -36,7 +36,20 @@ export function WebSocketProvider({ children, token, wsEndpoint }: WebSocketProv
   useEffect(() => {
     if (!token || !wsEndpoint) return;
 
-    const manager = new WebSocketManager(wsEndpoint, () => token, (event) => {
+    const getToken = async () => {
+      try {
+        const res = await fetch('/api/auth/token');
+        if (res.ok) {
+          const data = await res.json() as { token: string };
+          return data.token;
+        }
+      } catch {
+        // fall through to initial token on network error
+      }
+      return token;
+    };
+
+    const manager = new WebSocketManager(wsEndpoint, getToken, (event) => {
       handlersRef.current.forEach((h) => h(event));
     });
     manager.connect();

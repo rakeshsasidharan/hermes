@@ -73,7 +73,10 @@ describe('WebSocketManager', () => {
   const WS_URL = 'wss://example.execute-api.us-east-1.amazonaws.com/prod';
   const TOKEN = 'test-token-123';
 
-  function makeManager(onMessage = jest.fn(), getToken: () => string = () => TOKEN) {
+  function makeManager(
+    onMessage = jest.fn(),
+    getToken: () => string | Promise<string> = () => TOKEN,
+  ) {
     return new WebSocketManager(WS_URL, getToken, onMessage);
   }
 
@@ -100,6 +103,59 @@ describe('WebSocketManager', () => {
 
       expect(MockWebSocket.instances).toHaveLength(2);
       expect(MockWebSocket.instances[1].url).toContain('token-v2');
+    });
+
+    test('accepts an async getToken and opens socket after the promise resolves', async () => {
+      const manager = makeManager(jest.fn(), () => Promise.resolve('async-token'));
+      manager.connect();
+
+      // Socket not created synchronously — token is still resolving
+      expect(MockWebSocket.instances).toHaveLength(0);
+
+      await Promise.resolve(); // flush microtask queue
+      expect(MockWebSocket.instances).toHaveLength(1);
+      expect(MockWebSocket.instances[0].url).toContain('async-token');
+    });
+
+    test('async getToken: reconnect uses a fresh token each time', async () => {
+      let currentToken = 'token-v1';
+      const manager = makeManager(jest.fn(), () => Promise.resolve(currentToken));
+      manager.connect();
+      await Promise.resolve();
+      expect(MockWebSocket.instances[0].url).toContain('token-v1');
+
+      MockWebSocket.instances[0].simulateClose();
+      currentToken = 'token-v2';
+      jest.advanceTimersByTime(1_000);
+      await Promise.resolve(); // flush async getToken
+
+      expect(MockWebSocket.instances).toHaveLength(2);
+      expect(MockWebSocket.instances[1].url).toContain('token-v2');
+    });
+
+    test('async getToken: schedules reconnect if token resolves to empty string', async () => {
+      const manager = makeManager(jest.fn(), () => Promise.resolve(''));
+      manager.connect();
+      await Promise.resolve();
+
+      expect(MockWebSocket.instances).toHaveLength(0);
+      jest.advanceTimersByTime(1_000);
+      await Promise.resolve();
+      // Still retrying — each attempt returns empty string
+      expect(MockWebSocket.instances).toHaveLength(0);
+    });
+
+    test('async getToken: schedules reconnect if token fetch rejects', async () => {
+      const manager = makeManager(
+        jest.fn(),
+        () => Promise.reject(new Error('network error')),
+      );
+      manager.connect();
+      await Promise.resolve();
+
+      jest.advanceTimersByTime(1_000);
+      // No socket created; it retried
+      expect(MockWebSocket.instances).toHaveLength(0);
     });
 
     test('does not open a second socket if already OPEN', () => {

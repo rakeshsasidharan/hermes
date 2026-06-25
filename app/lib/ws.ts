@@ -15,7 +15,7 @@ export class WebSocketManager {
 
   constructor(
     private readonly url: string,
-    private readonly getToken: () => string,
+    private readonly getToken: () => string | Promise<string>,
     private readonly onMessage: MessageHandler,
   ) {}
 
@@ -27,7 +27,38 @@ export class WebSocketManager {
       return;
     }
 
-    const wsUrl = `${this.url}?token=${encodeURIComponent(this.getToken())}`;
+    const tokenOrPromise = this.getToken();
+    if (typeof tokenOrPromise === 'string') {
+      this.openSocket(tokenOrPromise);
+    } else {
+      tokenOrPromise
+        .then((token) => {
+          if (token) {
+            this.openSocket(token);
+          } else if (this.shouldReconnect) {
+            this.scheduleReconnect();
+          }
+        })
+        .catch(() => {
+          if (this.shouldReconnect) {
+            this.scheduleReconnect();
+          }
+        });
+    }
+  }
+
+  disconnect(): void {
+    this.shouldReconnect = false;
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.socket?.close();
+    this.socket = null;
+  }
+
+  private openSocket(token: string): void {
+    const wsUrl = `${this.url}?token=${encodeURIComponent(token)}`;
     this.socket = new WebSocket(wsUrl);
 
     this.socket.onopen = () => {
@@ -48,8 +79,7 @@ export class WebSocketManager {
     this.socket.onclose = () => {
       this.socket = null;
       if (!this.shouldReconnect) return;
-      this.reconnectTimer = setTimeout(() => this.connect(), this.reconnectDelay);
-      this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxDelay);
+      this.scheduleReconnect();
     };
 
     this.socket.onerror = () => {
@@ -57,13 +87,8 @@ export class WebSocketManager {
     };
   }
 
-  disconnect(): void {
-    this.shouldReconnect = false;
-    if (this.reconnectTimer !== null) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-    this.socket?.close();
-    this.socket = null;
+  private scheduleReconnect(): void {
+    this.reconnectTimer = setTimeout(() => this.connect(), this.reconnectDelay);
+    this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxDelay);
   }
 }
