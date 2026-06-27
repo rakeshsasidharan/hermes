@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import type { AppDispatch } from "@/store";
-import { useGetMessagesQuery, apiSlice } from "@/store/api";
+import { apiSlice } from "@/store/api";
 import {
   Sidebar,
   SidebarContent,
@@ -129,21 +129,6 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
     });
   }, [subscribe]);
 
-  // Derive accurate inbox unread count from RTK Query cache for the selected address
-  const { data: selectedInboxData } = useGetMessagesQuery(
-    { address: selectedAddress ?? '', folder: 'inbox', direction: 'inbound' },
-    { skip: !selectedAddress },
-  );
-
-  useEffect(() => {
-    if (!selectedAddress || !selectedInboxData) return;
-    const count = selectedInboxData.messages.filter((m) => !m.isRead).length;
-    setUnreadCounts((prev) => {
-      const next = new Map(prev);
-      next.set(selectedAddress, count);
-      return next;
-    });
-  }, [selectedInboxData, selectedAddress]);
 
   async function handleCompose() {
     if (!selectedAddress || isComposing || isOnDraftDetailRoute) return;

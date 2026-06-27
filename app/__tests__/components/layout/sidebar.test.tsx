@@ -52,17 +52,13 @@ jest.mock('react-redux', () => ({
 
 const mockSidebarInvalidateTags = jest.fn(() => ({ type: 'test/invalidate' }));
 
-// Mock RTK Query hook — sidebar uses this to derive inbox unread count
 jest.mock('@/store/api', () => ({
-  useGetMessagesQuery: jest.fn(() => ({ data: null, isFetching: false })),
   apiSlice: {
     util: {
       invalidateTags: (...args: unknown[]) => mockSidebarInvalidateTags(...args),
     },
   },
 }));
-
-import { useGetMessagesQuery } from '@/store/api';
 
 const ADDRESSES = [
   { email: 'hello@example.com', domain: 'example.com', status: 'active', unreadCount: 3 },
@@ -101,7 +97,6 @@ beforeEach(() => {
   mockSidebarInvalidateTags.mockClear();
   wsHandler = null;
   mockSubscribe.mockClear();
-  (useGetMessagesQuery as jest.Mock).mockReturnValue({ data: null, isFetching: false });
 });
 
 afterEach(() => {
@@ -186,25 +181,6 @@ describe('AppSidebar', () => {
     mockPathname.mockReturnValue('/inbox/hello%40example.com');
     renderSidebar();
     expect(screen.getByText('3')).toBeInTheDocument();
-  });
-
-  test('updates unread badge when RTK Query inbox data is available', async () => {
-    mockPathname.mockReturnValue('/inbox/hello%40example.com');
-    (useGetMessagesQuery as jest.Mock).mockReturnValue({
-      data: {
-        messages: [
-          { messageId: 'msg-1', isRead: false },
-          { messageId: 'msg-2', isRead: false },
-          { messageId: 'msg-3', isRead: true },
-        ],
-        nextCursor: null,
-      },
-      isFetching: false,
-    });
-    renderSidebar();
-    await waitFor(() => {
-      expect(screen.getByText('2')).toBeInTheDocument();
-    });
   });
 
   test('increments unread badge when WebSocket new_message event arrives', async () => {

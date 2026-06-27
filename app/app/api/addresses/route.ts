@@ -41,8 +41,9 @@ export async function GET(req: NextRequest) {
           TableName: process.env.MESSAGES_TABLE!,
           IndexName: 'address-receivedAt-index',
           KeyConditionExpression: 'address = :addr',
-          FilterExpression: 'isRead = :false AND direction = :dir',
-          ExpressionAttributeValues: { ':addr': addr.email, ':false': false, ':dir': 'inbound' },
+          FilterExpression: 'isRead = :false AND direction = :dir AND (#folder = :inbox OR attribute_not_exists(#folder))',
+          ExpressionAttributeNames: { '#folder': 'folder' },
+          ExpressionAttributeValues: { ':addr': addr.email, ':false': false, ':dir': 'inbound', ':inbox': 'inbox' },
           Select: 'COUNT',
         }));
         return { ...addr, unreadCount: unread.Count ?? 0 };
