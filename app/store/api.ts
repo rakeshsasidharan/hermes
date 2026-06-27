@@ -1,4 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { incrementCount, decrementCount } from './unread-counts-slice';
 
 export type TagType = 'Message' | 'Draft' | 'Folder' | 'Thread';
 
@@ -167,8 +168,13 @@ export const apiSlice = createApi({
             },
           ),
         );
+        // Only inbox messages affect the badge count
+        const isInbox = folder === 'inbox' || folder === undefined;
         try {
           await queryFulfilled;
+          if (isInbox) {
+            dispatch(isRead ? decrementCount(address) : incrementCount(address));
+          }
         } catch {
           patch.undo();
         }
@@ -184,17 +190,24 @@ export const apiSlice = createApi({
         { messageId, fromAddress, fromFolder, fromDirection },
         { dispatch, queryFulfilled },
       ) {
+        // Check if the message being moved is unread in inbox before removing it
+        let wasUnreadInInbox = false;
         const patch = dispatch(
           apiSlice.util.updateQueryData(
             'getMessages',
             { address: fromAddress, folder: fromFolder, direction: fromDirection },
             (draft) => {
+              const msg = draft.messages.find((m) => m.messageId === messageId);
+              if (msg && !msg.isRead && (fromFolder === 'inbox' || fromFolder === undefined)) {
+                wasUnreadInInbox = true;
+              }
               draft.messages = draft.messages.filter((m) => m.messageId !== messageId);
             },
           ),
         );
         try {
           await queryFulfilled;
+          if (wasUnreadInInbox) dispatch(decrementCount(fromAddress));
         } catch {
           patch.undo();
         }
