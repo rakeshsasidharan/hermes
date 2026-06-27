@@ -103,6 +103,23 @@ describe('GET /api/addresses', () => {
     expect(body).toEqual({ addresses: [] });
   });
 
+  test('unread count query filters to inbox folder only', async () => {
+    mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
+    setupGetMock([{ email: 'hello@example.com', domain: 'example.com', status: 'active' }], 5);
+
+    await GET(makeGetReq());
+
+    const queryArg = (mockDynamoSend.mock.calls as [Record<string, unknown>][])
+      .map(([cmd]) => cmd)
+      .find((cmd) => cmd.IndexName !== undefined);
+
+    expect(queryArg).toMatchObject({
+      FilterExpression: expect.stringContaining('attribute_not_exists(#folder)'),
+      ExpressionAttributeNames: expect.objectContaining({ '#folder': 'folder' }),
+      ExpressionAttributeValues: expect.objectContaining({ ':inbox': 'inbox' }),
+    });
+  });
+
   test('filters out soft-deleted addresses via FilterExpression', async () => {
     mockRequireAuth.mockResolvedValue({ sub: 'user-1' });
     setupGetMock([]);
