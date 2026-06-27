@@ -3,9 +3,10 @@
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useDispatch } from "react-redux";
-import type { AppDispatch } from "@/store";
+import { useDispatch, useSelector } from "react-redux";
+import type { AppDispatch, RootState } from "@/store";
 import { apiSlice } from "@/store/api";
+import { initCounts, incrementCount } from "@/store/unread-counts-slice";
 import {
   Sidebar,
   SidebarContent,
@@ -108,26 +109,26 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
     setSwitchingToAddress(null);
   }, [pathname]);
 
-  const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(() => {
-    const map = new Map<string, number>();
+  const unreadCountsMap = useSelector((state: RootState) => state.unreadCounts.counts);
+
+  // Initialise counts from server-rendered address props
+  useEffect(() => {
+    const initial: Record<string, number> = {};
     for (const addr of addresses) {
       if (addr.unreadCount && addr.unreadCount > 0) {
-        map.set(addr.email, addr.unreadCount);
+        initial[addr.email] = addr.unreadCount;
       }
     }
-    return map;
-  });
+    dispatch(initCounts(initial));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally run once on mount
 
-  // Increment from WS events (best-effort; overridden by RTK Query cache when inbox is open)
+  // Increment from WS new_message events
   useEffect(() => {
     return subscribe((event) => {
-      setUnreadCounts((prev) => {
-        const next = new Map(prev);
-        next.set(event.address, (next.get(event.address) ?? 0) + 1);
-        return next;
-      });
+      dispatch(incrementCount(event.address));
     });
-  }, [subscribe]);
+  }, [subscribe, dispatch]);
 
 
   async function handleCompose() {
@@ -179,7 +180,7 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
   }
 
   const activeFolder = FOLDERS.find((f) => pathname.startsWith(`/${f.key}/`))?.key ?? null;
-  const inboxUnread = selectedAddress ? (unreadCounts.get(selectedAddress) ?? 0) : 0;
+  const inboxUnread = selectedAddress ? (unreadCountsMap[selectedAddress] ?? 0) : 0;
 
   return (
     <Sidebar collapsible="icon">
@@ -226,9 +227,9 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
                         : <Mail className="h-4 w-4 shrink-0 opacity-0" />
                       }
                       <span className="flex-1 truncate">{addr.email}</span>
-                      {(unreadCounts.get(addr.email) ?? 0) > 0 && (
+                      {(unreadCountsMap[addr.email] ?? 0) > 0 && (
                         <span className="ml-auto shrink-0 rounded-full bg-sidebar-primary px-1.5 py-0.5 text-xs font-medium text-sidebar-primary-foreground">
-                          {unreadCounts.get(addr.email)}
+                          {unreadCountsMap[addr.email]}
                         </span>
                       )}
                     </DropdownMenuItem>

@@ -1,7 +1,10 @@
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Provider } from 'react-redux';
 import { AppSidebar } from '@/components/layout/sidebar';
 import { SidebarProvider } from '@/components/ui/sidebar';
+import { makeStore } from '@/store';
+import { apiSlice } from '@/store/api';
 import type { WsNewMessageEvent } from '@/lib/ws';
 
 const mockPush = jest.fn();
@@ -45,35 +48,26 @@ jest.mock('@/components/ui/tooltip', () => ({
   TooltipContent: () => null,
 }));
 
-const mockSidebarDispatch = jest.fn((action) => action);
-jest.mock('react-redux', () => ({
-  useDispatch: () => mockSidebarDispatch,
-}));
-
-const mockSidebarInvalidateTags = jest.fn(() => ({ type: 'test/invalidate' }));
-
-jest.mock('@/store/api', () => ({
-  apiSlice: {
-    util: {
-      invalidateTags: (...args: unknown[]) => mockSidebarInvalidateTags(...args),
-    },
-  },
-}));
-
 const ADDRESSES = [
   { email: 'hello@example.com', domain: 'example.com', status: 'active', unreadCount: 3 },
   { email: 'info@example.com', domain: 'example.com', status: 'active', unreadCount: 0 },
 ];
 
+let store: ReturnType<typeof makeStore>;
+let invalidateTagsSpy: jest.SpyInstance;
+
 function renderSidebar(addresses = ADDRESSES) {
   return render(
-    <SidebarProvider>
-      <AppSidebar addresses={addresses} />
-    </SidebarProvider>,
+    <Provider store={store}>
+      <SidebarProvider>
+        <AppSidebar addresses={addresses} />
+      </SidebarProvider>
+    </Provider>,
   );
 }
 
 beforeAll(() => {
+  global.fetch = jest.fn();
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
     value: jest.fn().mockImplementation((query: string) => ({
@@ -90,16 +84,24 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  store = makeStore();
+  // Preserve action-creator properties (.match, .type) needed by RTK Query middleware
+  const origFn = apiSlice.util.invalidateTags as unknown as Record<string, unknown>;
+  const origMatch = origFn['match'];
+  const origType = origFn['type'];
+  invalidateTagsSpy = jest.spyOn(apiSlice.util, 'invalidateTags');
+  const spyFn = apiSlice.util.invalidateTags as unknown as Record<string, unknown>;
+  spyFn['match'] = origMatch;
+  spyFn['type'] = origType;
   global.fetch = jest.fn();
   mockPathname.mockReturnValue('/');
   mockPush.mockReset();
-  mockSidebarDispatch.mockClear();
-  mockSidebarInvalidateTags.mockClear();
   wsHandler = null;
   mockSubscribe.mockClear();
 });
 
 afterEach(() => {
+  invalidateTagsSpy.mockRestore();
   jest.clearAllMocks();
 });
 
@@ -297,8 +299,7 @@ describe('AppSidebar', () => {
     await user.click(screen.getByTestId('compose-button'));
 
     await waitFor(() => {
-      expect(mockSidebarInvalidateTags).toHaveBeenCalledWith(['Draft']);
-      expect(mockSidebarDispatch).toHaveBeenCalledWith({ type: 'test/invalidate' });
+      expect(invalidateTagsSpy).toHaveBeenCalledWith(['Draft']);
     });
   });
 
@@ -318,7 +319,7 @@ describe('AppSidebar', () => {
         `/drafts/${encodeURIComponent('hello@example.com')}/existing-draft`,
       );
     });
-    expect(mockSidebarInvalidateTags).not.toHaveBeenCalled();
+    expect(invalidateTagsSpy).not.toHaveBeenCalled();
   });
 
   test('Compose button is disabled when on a draft detail route', () => {

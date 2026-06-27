@@ -24,3 +24,25 @@ if (typeof Request === 'undefined') {
   );
   Object.assign(global, { Request: Req, Response: Res, Headers: Hdrs });
 }
+
+// The edge-runtime Request constructor requires absolute URLs. Wrap it so that
+// relative URLs (starting with '/') work in test environments by prepending
+// 'http://localhost'. This lets RTK Query's fetchBaseQuery operate with the
+// '/api' base URL without throwing a parse error.
+const _OriginalRequest = global.Request as typeof Request;
+class _TestRequest extends _OriginalRequest {
+  constructor(input: RequestInfo | URL, init?: RequestInit) {
+    if (typeof input === 'string' && input.startsWith('/')) {
+      super(`http://localhost${input}`, init);
+    } else {
+      super(input, init);
+    }
+  }
+}
+(global as unknown as Record<string, unknown>).Request = _TestRequest;
+
+// Provide a default fetch stub so RTK Query's fetchBaseQuery has a fetchFn
+// at module-load time. Individual tests override this in their own beforeEach.
+if (typeof global.fetch === 'undefined') {
+  global.fetch = jest.fn();
+}

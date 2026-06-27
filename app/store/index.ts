@@ -1,10 +1,12 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { apiSlice } from './api';
+import unreadCountsReducer from './unread-counts-slice';
 
 export const makeStore = () =>
   configureStore({
     reducer: {
       [apiSlice.reducerPath]: apiSlice.reducer,
+      unreadCounts: unreadCountsReducer,
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware().concat(apiSlice.middleware),
