@@ -155,6 +155,8 @@ export class HermesAppStack extends cdk.Stack {
       authType: lambda.FunctionUrlAuthType.NONE,
     });
 
+    const staticAssetOrigin = new origins.FunctionUrlOrigin(functionUrl);
+
     const distribution = new cloudfront.Distribution(this, 'AppDistribution', {
       defaultBehavior: {
         origin: new origins.FunctionUrlOrigin(functionUrl),
@@ -162,6 +164,17 @@ export class HermesAppStack extends cdk.Stack {
         cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
         originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
         allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+      },
+      // Next.js content-hashes all /_next/static/* assets so they are safe to
+      // cache at the edge indefinitely. This avoids hitting Lambda for every JS
+      // chunk, font, and icon on every page load.
+      additionalBehaviors: {
+        '/_next/static/*': {
+          origin: staticAssetOrigin,
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
+        },
       },
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
       ...(props.domainName && props.certificate ? {
