@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SESClient, ListIdentitiesCommand, CreateReceiptRuleCommand } from '@aws-sdk/client-ses';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, ScanCommand, PutCommand, GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { requireAuth, AuthError } from '@/lib/auth/require-auth';
+import { queryAddresses } from '@/lib/data/addresses';
 
 function getSes() {
   return new SESClient({ region: process.env.AWS_REGION ?? 'us-east-1' });
@@ -22,38 +23,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 
-  const dynamo = getDynamo();
-  const result = await dynamo.send(new ScanCommand({
-    TableName: process.env.ADDRESSES_TABLE!,
-    FilterExpression: '#s <> :deleted',
-    ExpressionAttributeNames: { '#s': 'status' },
-    ExpressionAttributeValues: { ':deleted': 'deleted' },
-  }));
-
-  const addresses = result.Items ?? [];
-
-  // Fetch unread counts for all active addresses in parallel.
-  const withCounts = await Promise.all(
-    addresses.map(async (addr) => {
-      if (addr.status !== 'active') return { ...addr, unreadCount: 0 };
-      try {
-        const unread = await dynamo.send(new QueryCommand({
-          TableName: process.env.MESSAGES_TABLE!,
-          IndexName: 'address-receivedAt-index',
-          KeyConditionExpression: 'address = :addr',
-          FilterExpression: 'isRead = :false AND direction = :dir AND (#folder = :inbox OR attribute_not_exists(#folder))',
-          ExpressionAttributeNames: { '#folder': 'folder' },
-          ExpressionAttributeValues: { ':addr': addr.email, ':false': false, ':dir': 'inbound', ':inbox': 'inbox' },
-          Select: 'COUNT',
-        }));
-        return { ...addr, unreadCount: unread.Count ?? 0 };
-      } catch {
-        return { ...addr, unreadCount: 0 };
-      }
-    }),
-  );
-
-  return NextResponse.json({ addresses: withCounts });
+  const addresses = await queryAddresses();
+  return NextResponse.json({ addresses });
 }
 
 export async function POST(req: NextRequest) {

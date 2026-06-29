@@ -5,30 +5,8 @@ import { ConditionalLayout } from '@/components/layout/conditional-layout';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { WebSocketProvider } from '@/components/ws-context';
 import { SIDEBAR_STATE_COOKIE } from '@/lib/preferences';
-
-interface Address {
-  email: string;
-  domain: string;
-  status: string;
-  unreadCount?: number;
-}
-
-async function getAddresses(token: string): Promise<Address[]> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
-  const res = await fetch(`${baseUrl}/api/addresses`, {
-    headers: { Cookie: `access_token=${token}` },
-    cache: 'no-store',
-  });
-
-  if (res.status === 401) {
-    redirect('/login');
-  }
-
-  if (!res.ok) return [];
-
-  const data = await res.json();
-  return data.addresses ?? [];
-}
+import { verifyToken } from '@/lib/auth/require-auth';
+import { queryAddresses } from '@/lib/data/addresses';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies();
@@ -38,7 +16,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/login');
   }
 
-  const addresses = await getAddresses(token);
+  try {
+    await verifyToken(token);
+  } catch {
+    redirect('/login');
+  }
+
+  const addresses = await queryAddresses();
   const wsEndpoint = process.env.NEXT_PUBLIC_WEBSOCKET_ENDPOINT ?? '';
 
   const sidebarStateCookie = cookieStore.get(SIDEBAR_STATE_COOKIE)?.value;

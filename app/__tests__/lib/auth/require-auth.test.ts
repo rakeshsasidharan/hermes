@@ -1,5 +1,5 @@
 import { type NextRequest } from 'next/server';
-import { requireAuth, AuthError } from '@/lib/auth/require-auth';
+import { requireAuth, verifyToken, AuthError } from '@/lib/auth/require-auth';
 import { clearJwksCache } from '@/lib/auth/jwks-cache';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -165,5 +165,32 @@ describe('requireAuth', () => {
       const req = makeRequest({ authHeader: 'Bearer some.token' });
       await expect(requireAuth(req)).rejects.toMatchObject({ status: 500 });
     });
+  });
+});
+
+describe('verifyToken', () => {
+  test('returns decoded claims for a valid token string', async () => {
+    const claims = { sub: 'user-123', email: 'user@example.com' };
+    mockJwtVerify.mockResolvedValueOnce({ payload: claims });
+
+    const result = await verifyToken('valid.jwt.token');
+
+    expect(result).toEqual(claims);
+    expect(mockJwtVerify).toHaveBeenCalledWith('valid.jwt.token', FAKE_JWKS, expect.any(Object));
+  });
+
+  test('throws AuthError 401 for an invalid token string', async () => {
+    mockJwtVerify.mockRejectedValueOnce(new Error('JWTExpired'));
+
+    await expect(verifyToken('expired.token')).rejects.toMatchObject({
+      status: 401,
+      message: 'Invalid or expired token',
+    });
+  });
+
+  test('throws AuthError 500 when COGNITO_USER_POOL_ID is missing', async () => {
+    delete process.env.COGNITO_USER_POOL_ID;
+
+    await expect(verifyToken('some.token')).rejects.toMatchObject({ status: 500 });
   });
 });

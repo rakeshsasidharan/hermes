@@ -18,7 +18,7 @@ export interface CognitoClaims extends JWTPayload {
   token_use?: string;
 }
 
-export async function requireAuth(req: NextRequest): Promise<CognitoClaims> {
+export async function verifyToken(token: string): Promise<CognitoClaims> {
   const userPoolId = process.env.COGNITO_USER_POOL_ID;
   const region = process.env.AWS_REGION ?? 'us-east-1';
 
@@ -26,6 +26,18 @@ export async function requireAuth(req: NextRequest): Promise<CognitoClaims> {
     throw new AuthError('Server misconfiguration: COGNITO_USER_POOL_ID not set', 500);
   }
 
+  const issuer = `https://cognito-idp.${region}.amazonaws.com/${userPoolId}`;
+  const jwks = getJwks(userPoolId, region);
+
+  try {
+    const { payload } = await jwtVerify(token, jwks, { issuer });
+    return payload as CognitoClaims;
+  } catch {
+    throw new AuthError('Invalid or expired token');
+  }
+}
+
+export async function requireAuth(req: NextRequest): Promise<CognitoClaims> {
   const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization');
   let token: string | undefined;
 
@@ -40,16 +52,5 @@ export async function requireAuth(req: NextRequest): Promise<CognitoClaims> {
     throw new AuthError('Missing authentication token');
   }
 
-  const issuer = `https://cognito-idp.${region}.amazonaws.com/${userPoolId}`;
-  const jwks = getJwks(userPoolId, region);
-
-  try {
-    const { payload } = await jwtVerify(token, jwks, {
-      issuer,
-    });
-
-    return payload as CognitoClaims;
-  } catch {
-    throw new AuthError('Invalid or expired token');
-  }
+  return verifyToken(token);
 }
