@@ -55,7 +55,7 @@ export async function POST(
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  const { from, to, cc, bcc, body: emailBody, attachmentKeys, draftId } = payload;
+  const { from, to, cc, bcc, body: emailBody, htmlBody, attachmentKeys, draftId } = payload;
 
   if (!from || !to) {
     return NextResponse.json({ error: 'from and to are required' }, { status: 400 });
@@ -105,6 +105,7 @@ export async function POST(
     ...(bcc ? { bcc: bcc as string } : {}),
     subject: reSubject,
     text: emailBody as string ?? '',
+    ...(htmlBody ? { html: htmlBody as string } : {}),
     headers: {
       'In-Reply-To': inReplyToHeader,
       References: inReplyToHeader,
