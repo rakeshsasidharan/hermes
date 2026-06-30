@@ -27,6 +27,7 @@ export interface SendEmailPayload {
   bcc?: string;
   subject: string;
   body: string;
+  htmlBody?: string;
   attachmentKeys?: string[];
   draftId?: string;
 }
@@ -92,6 +93,7 @@ export interface ReplyPayload {
   to: string;
   cc?: string;
   body: string;
+  htmlBody?: string;
   subject?: string;
   attachmentKeys?: string[];
   draftId?: string;

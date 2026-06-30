@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  const { from, to, cc, bcc, subject, body: emailBody, attachmentKeys, draftId } = payload;
+  const { from, to, cc, bcc, subject, body: emailBody, htmlBody, attachmentKeys, draftId } = payload;
 
   if (!from || !to || !subject || emailBody === undefined || emailBody === null) {
     return NextResponse.json({ error: 'from, to, subject, and body are required' }, { status: 400 });
@@ -200,6 +200,7 @@ export async function POST(req: NextRequest) {
     ...(bcc ? { bcc: bcc as string } : {}),
     subject: subject as string,
     text: emailBody as string,
+    ...(htmlBody ? { html: htmlBody as string } : {}),
     attachments: mimeAttachments,
   });
 

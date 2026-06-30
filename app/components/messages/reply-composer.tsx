@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,7 @@ interface ReplyComposerProps {
   isSent?: boolean;
   currentAddress: string;
   quotedBody?: string | null;
+  quotedHtml?: string | null;
   initialDraftId?: string | null;
   initialBody?: string;
   onClose: () => void;
@@ -55,6 +56,7 @@ export function ReplyComposer({
   isSent = false,
   currentAddress,
   quotedBody,
+  quotedHtml,
   initialDraftId = null,
   initialBody,
   onClose,
@@ -85,9 +87,15 @@ export function ReplyComposer({
     ? buildCcForReplyAll(message, currentAddress, isSent)
     : '';
 
-  const defaultBody = initialBody ?? (quotedBody
+  const defaultBody = initialBody ?? (!quotedHtml && quotedBody
     ? `\n\n--- ${mode === 'forward' ? 'Forwarded Message' : 'Original Message'} ---\n${quotedBody}`
     : '');
+
+  const [iframeHeight, setIframeHeight] = useState(200);
+  const handleQuoteLoad = useCallback((e: React.SyntheticEvent<HTMLIFrameElement>) => {
+    const doc = e.currentTarget.contentDocument?.documentElement;
+    if (doc) setIframeHeight(doc.scrollHeight);
+  }, []);
 
   const [to, setTo] = useState(defaultTo);
   const [cc, setCc] = useState(defaultCc);
@@ -138,6 +146,16 @@ export function ReplyComposer({
     }
   }
 
+  function buildHtmlBody(): string | undefined {
+    if (!quotedHtml) return undefined;
+    const label = mode === 'forward' ? 'Forwarded Message' : 'Original Message';
+    const escaped = body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const userPart = body
+      ? `<div style="font-family:inherit;white-space:pre-wrap;margin-bottom:16px">${escaped}</div>`
+      : '';
+    return `${userPart}<hr style="border:none;border-top:1px solid #ccc;margin:16px 0"><p style="color:#888;font-size:12px;margin:0 0 8px">--- ${label} ---</p><blockquote style="margin:0 0 0 0.8ex;border-left:3px solid #ccc;padding-left:1ex">${quotedHtml}</blockquote>`;
+  }
+
   function buildPayload() {
     return {
       from: currentAddress,
@@ -181,6 +199,7 @@ export function ReplyComposer({
     setSendError(null);
     try {
       let result;
+      const htmlBody = buildHtmlBody();
       if (mode === 'forward') {
         result = await sendEmail({
           from: currentAddress,
@@ -188,6 +207,7 @@ export function ReplyComposer({
           cc: cc || undefined,
           subject: defaultSubject,
           body,
+          ...(htmlBody ? { htmlBody } : {}),
           attachmentKeys: attachments.map((a) => a.s3Key),
           draftId: draftId ?? undefined,
         });
@@ -199,6 +219,7 @@ export function ReplyComposer({
             to,
             cc: cc || undefined,
             body,
+            ...(htmlBody ? { htmlBody } : {}),
             attachmentKeys: attachments.map((a) => a.s3Key),
             draftId: draftId ?? undefined,
           },
@@ -296,6 +317,21 @@ export function ReplyComposer({
             className="min-h-40 resize-y"
             data-testid="reply-body"
           />
+          {quotedHtml && (
+            <div className="mt-2 border-l-2 border-muted pl-3">
+              <p className="text-xs text-muted-foreground mb-1">
+                --- {mode === 'forward' ? 'Forwarded Message' : 'Original Message'} ---
+              </p>
+              <iframe
+                srcDoc={quotedHtml}
+                sandbox="allow-same-origin"
+                className="w-full border-0"
+                style={{ height: iframeHeight }}
+                title="Quoted message"
+                onLoad={handleQuoteLoad}
+              />
+            </div>
+          )}
         </div>
 
         {attachments.length > 0 && (

@@ -78,6 +78,7 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
 
   const [htmlBody] = useState<string | null>(initialHtmlBody ?? null);
   const [textBody] = useState<string | null>(initialTextBody ?? null);
+  const [iframeHeight, setIframeHeight] = useState(400);
   const [isRead, setIsRead] = useState(message.isRead);
   const [composerMode, setComposerMode] = useState<ComposerMode>(initialComposerMode ?? null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -357,6 +358,7 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
               isSent={isSent}
               currentAddress={currentAddress}
               quotedBody={textBody}
+              quotedHtml={htmlBody}
               initialDraftId={initialDraftId}
               onClose={() => setComposerMode(null)}
             />
@@ -367,9 +369,14 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
                   <iframe
                     srcDoc={htmlBody}
                     sandbox="allow-same-origin"
-                    className="w-full min-h-96 border-0"
+                    className="w-full border-0"
+                    style={{ height: iframeHeight }}
                     title="Email body"
                     data-testid="html-body-frame"
+                    onLoad={(e) => {
+                      const doc = e.currentTarget.contentDocument?.documentElement;
+                      if (doc) setIframeHeight(doc.scrollHeight);
+                    }}
                   />
                 ) : textBody ? (
                   <pre className="whitespace-pre-wrap text-sm font-sans" data-testid="text-body">
@@ -386,8 +393,8 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
                     Attachments ({message.attachments.length})
                   </h3>
                   <ul className="space-y-2">
-                    {message.attachments.map((att) => (
-                      <li key={att.filename} className="flex items-center justify-between gap-2">
+                    {message.attachments.map((att, i) => (
+                      <li key={att.filename ?? i} className="flex items-center justify-between gap-2">
                         <span className="text-sm truncate">{att.filename}</span>
                         <Button asChild size="sm" variant="outline" className="gap-1 shrink-0">
                           <a href={att.url} download={att.filename} target="_blank" rel="noopener noreferrer">
