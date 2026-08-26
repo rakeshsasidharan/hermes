@@ -1,5 +1,5 @@
 import { render } from '@testing-library/react';
-import InboxLoading from '@/app/(app)/inbox/[address]/loading';
+import InboxLoading from '@/app/(app)/inbox/loading';
 
 describe('Inbox loading', () => {
   test('renders list skeleton rows and a detail spinner', () => {
