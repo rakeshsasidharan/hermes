@@ -5,7 +5,6 @@ import { ConditionalLayout } from '@/components/layout/conditional-layout';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { WebSocketProvider } from '@/components/ws-context';
 import { SIDEBAR_STATE_COOKIE } from '@/lib/preferences';
-import { verifyToken } from '@/lib/auth/require-auth';
 import { queryAddresses } from '@/lib/data/addresses';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -13,12 +12,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const token = cookieStore.get('access_token')?.value;
 
   if (!token) {
-    redirect('/login');
-  }
-
-  try {
-    await verifyToken(token);
-  } catch {
     redirect('/login');
   }
 
