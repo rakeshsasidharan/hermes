@@ -172,13 +172,16 @@ export const apiSlice = createApi({
         );
         // Only inbox messages affect the badge count
         const isInbox = folder === 'inbox' || folder === undefined;
+        if (isInbox) {
+          dispatch(isRead ? decrementCount(address) : incrementCount(address));
+        }
         try {
           await queryFulfilled;
-          if (isInbox) {
-            dispatch(isRead ? decrementCount(address) : incrementCount(address));
-          }
         } catch {
           patch.undo();
+          if (isInbox) {
+            dispatch(isRead ? incrementCount(address) : decrementCount(address));
+          }
         }
       },
     }),
@@ -207,11 +210,12 @@ export const apiSlice = createApi({
             },
           ),
         );
+        if (wasUnreadInInbox) dispatch(decrementCount(fromAddress));
         try {
           await queryFulfilled;
-          if (wasUnreadInInbox) dispatch(decrementCount(fromAddress));
         } catch {
           patch.undo();
+          if (wasUnreadInInbox) dispatch(incrementCount(fromAddress));
         }
       },
       invalidatesTags: (_result, error, { targetFolder, fromAddress }) =>

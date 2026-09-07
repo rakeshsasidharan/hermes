@@ -218,6 +218,71 @@ describe('apiSlice — markReadStatus unread count side effects', () => {
 
     expect((store.getState() as ReturnType<typeof store['getState']>).unreadCounts.counts['test@example.com']).toBe(3);
   });
+
+  it('decrements unread count synchronously, before the network request resolves', async () => {
+    const store = makeStore();
+    store.dispatch(initCounts({ 'test@example.com': 5 }));
+
+    const message = { messageId: 'msg-1', subject: 'Hi', receivedAt: '2026-01-01T10:00:00Z', isRead: false, address: 'test@example.com' };
+    store.dispatch(
+      apiSlice.util.upsertQueryData(
+        'getMessages',
+        { address: 'test@example.com', folder: 'inbox', direction: undefined },
+        { messages: [message], nextCursor: null },
+      ),
+    );
+
+    let resolveFetch: (value: Response) => void;
+    (global.fetch as jest.Mock).mockReturnValue(
+      new Promise((resolve) => {
+        resolveFetch = resolve;
+      }),
+    );
+
+    const promise = store.dispatch(
+      apiSlice.endpoints.markReadStatus.initiate({
+        messageId: 'msg-1',
+        isRead: true,
+        address: 'test@example.com',
+        folder: 'inbox',
+      }),
+    );
+
+    // Count must already be decremented while the request is still in flight.
+    expect((store.getState() as ReturnType<typeof store['getState']>).unreadCounts.counts['test@example.com']).toBe(4);
+
+    resolveFetch!(jsonResponse({ message: { ...message, isRead: true } }));
+    await promise;
+
+    expect((store.getState() as ReturnType<typeof store['getState']>).unreadCounts.counts['test@example.com']).toBe(4);
+  });
+
+  it('rolls back unread count when the markReadStatus request fails', async () => {
+    const store = makeStore();
+    store.dispatch(initCounts({ 'test@example.com': 5 }));
+
+    const message = { messageId: 'msg-1', subject: 'Hi', receivedAt: '2026-01-01T10:00:00Z', isRead: false, address: 'test@example.com' };
+    store.dispatch(
+      apiSlice.util.upsertQueryData(
+        'getMessages',
+        { address: 'test@example.com', folder: 'inbox', direction: undefined },
+        { messages: [message], nextCursor: null },
+      ),
+    );
+
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({ error: 'boom' }, 500));
+
+    await store.dispatch(
+      apiSlice.endpoints.markReadStatus.initiate({
+        messageId: 'msg-1',
+        isRead: true,
+        address: 'test@example.com',
+        folder: 'inbox',
+      }),
+    );
+
+    expect((store.getState() as ReturnType<typeof store['getState']>).unreadCounts.counts['test@example.com']).toBe(5);
+  });
 });
 
 describe('apiSlice — moveMessage unread count side effects', () => {
@@ -284,5 +349,32 @@ describe('apiSlice — moveMessage unread count side effects', () => {
     );
 
     expect((store.getState() as ReturnType<typeof store['getState']>).unreadCounts.counts['test@example.com']).toBe(2);
+  });
+
+  it('rolls back unread count when the moveMessage request fails', async () => {
+    const store = makeStore();
+    store.dispatch(initCounts({ 'test@example.com': 4 }));
+
+    const message = { messageId: 'msg-1', subject: 'Hi', receivedAt: '2026-01-01T10:00:00Z', isRead: false, address: 'test@example.com' };
+    await store.dispatch(
+      apiSlice.util.upsertQueryData(
+        'getMessages',
+        { address: 'test@example.com', folder: 'inbox', direction: undefined },
+        { messages: [message], nextCursor: null },
+      ),
+    );
+
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({ error: 'boom' }, 500));
+
+    await store.dispatch(
+      apiSlice.endpoints.moveMessage.initiate({
+        messageId: 'msg-1',
+        targetFolder: 'trash',
+        fromAddress: 'test@example.com',
+        fromFolder: 'inbox',
+      }),
+    );
+
+    expect((store.getState() as ReturnType<typeof store['getState']>).unreadCounts.counts['test@example.com']).toBe(4);
   });
 });
