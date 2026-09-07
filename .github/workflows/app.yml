@@ -204,6 +204,15 @@ jobs:
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Get deployed WebSocket endpoint
+        if: steps.changes.outputs.app == 'true'
+        id: ws-endpoint
+        run: |
+          WS_ENDPOINT=$(aws cloudformation list-exports \
+            --query "Exports[?Name=='HermesWebSocketEndpoint'].Value" \
+            --output text 2>/dev/null || echo "")
+          echo "endpoint=$WS_ENDPOINT" >> "$GITHUB_OUTPUT"
+
       - name: Build and push Docker image to ECR
         if: steps.changes.outputs.app == 'true'
         id: docker-build
@@ -214,6 +223,7 @@ jobs:
           docker buildx build \
             --platform linux/amd64 \
             --push \
+            --build-arg NEXT_PUBLIC_WEBSOCKET_ENDPOINT="${{ steps.ws-endpoint.outputs.endpoint }}" \
             --tag "$IMAGE_URI:${{ github.sha }}" \
             --tag "$IMAGE_URI:latest" \
             app/
