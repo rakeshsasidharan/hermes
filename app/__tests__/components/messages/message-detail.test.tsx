@@ -119,6 +119,14 @@ describe('MessageDetail', () => {
     });
   });
 
+  test('reverts local read state when the auto-mark PATCH fails', async () => {
+    mockMarkReadStatusFn.mockResolvedValue({ error: { data: { message: 'boom' } } });
+    render(<MessageDetail message={{ ...BASE_MSG, isRead: false }} />);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /mark as read/i })).toBeInTheDocument();
+    });
+  });
+
   test('does not call PATCH when message is already read', async () => {
     render(<MessageDetail message={{ ...BASE_MSG, isRead: true }} />);
     await act(async () => { await new Promise((r) => setTimeout(r, 50)); });

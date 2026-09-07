@@ -96,6 +96,8 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
       address: fromAddress,
       folder: fromFolder,
       direction: fromDirection,
+    }).then((result) => {
+      if (result && 'error' in result) setIsRead(false);
     });
   }, [message.messageId, message.isRead, showReadToggle]);
 
