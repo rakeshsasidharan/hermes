@@ -43,7 +43,6 @@ export function MailboxCard({
         isActive
           ? 'bg-accent border-accent-foreground/20'
           : 'hover:bg-accent/60',
-        isUnread && !isActive && 'bg-accent/20',
         isSelected && !isActive && 'bg-accent/30',
       )}
     >
