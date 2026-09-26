@@ -100,8 +100,30 @@ describe('MessageDetail', () => {
     await waitFor(() => {
       const iframe = screen.getByTestId('html-body-frame');
       expect(iframe).toBeInTheDocument();
-      expect(iframe).toHaveAttribute('sandbox', 'allow-same-origin');
+      expect(iframe).toHaveAttribute('sandbox', 'allow-same-origin allow-popups allow-popups-to-escape-sandbox');
     });
+  });
+
+  test('email iframe does not allow scripts', async () => {
+    render(<MessageDetail message={BASE_MSG} initialHtmlBody="<p>HTML body</p>" />);
+    const iframe = await screen.findByTestId('html-body-frame');
+    expect(iframe.getAttribute('sandbox')).not.toContain('allow-scripts');
+  });
+
+  test('email iframe links open in a new tab without window.opener access', async () => {
+    render(
+      <MessageDetail
+        message={BASE_MSG}
+        initialHtmlBody='<p><a href="https://example.com" target="_self">link</a></p>'
+      />,
+    );
+    const srcdoc = (await screen.findByTestId('html-body-frame')).getAttribute('srcdoc') ?? '';
+    const container = document.createElement('div');
+    container.innerHTML = srcdoc;
+    const link = container.querySelector('a');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(container.querySelector('base')).toHaveAttribute('target', '_blank');
   });
 
   test('renders plain text body when initialTextBody is provided', () => {

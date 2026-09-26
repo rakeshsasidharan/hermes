@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { BookMarked, Paperclip, Send, Trash2, X } from 'lucide-react';
 import { useReplyToMessageMutation, useSendEmailMutation } from '@/store/api';
+import { EMAIL_IFRAME_SANDBOX, prepareEmailHtml } from '@/lib/email-html';
 
 interface Message {
   messageId: string;
@@ -323,8 +324,8 @@ export function ReplyComposer({
                 --- {mode === 'forward' ? 'Forwarded Message' : 'Original Message'} ---
               </p>
               <iframe
-                srcDoc={quotedHtml}
-                sandbox="allow-same-origin"
+                srcDoc={prepareEmailHtml(quotedHtml)}
+                sandbox={EMAIL_IFRAME_SANDBOX}
                 className="w-full border-0"
                 style={{ height: iframeHeight }}
                 title="Quoted message"
