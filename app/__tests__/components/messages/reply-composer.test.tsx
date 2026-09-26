@@ -102,6 +102,32 @@ describe('ReplyComposer', () => {
     });
   });
 
+  describe('quoted html iframe', () => {
+    test('is sandboxed without scripts and allows popups', async () => {
+      await act(async () => {
+        render(<ReplyComposer {...DEFAULT_PROPS} quotedHtml="<p>quoted</p>" />);
+      });
+
+      const sandbox = screen.getByTitle('Quoted message').getAttribute('sandbox') ?? '';
+      expect(sandbox).toContain('allow-popups');
+      expect(sandbox).toContain('allow-popups-to-escape-sandbox');
+      expect(sandbox).not.toContain('allow-scripts');
+    });
+
+    test('links open in a new tab without window.opener access', async () => {
+      await act(async () => {
+        render(<ReplyComposer {...DEFAULT_PROPS} quotedHtml='<a href="https://example.com">link</a>' />);
+      });
+
+      const srcdoc = screen.getByTitle('Quoted message').getAttribute('srcdoc') ?? '';
+      const container = document.createElement('div');
+      container.innerHTML = srcdoc;
+      const link = container.querySelector('a');
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    });
+  });
+
   describe('save draft button', () => {
     test('shows Save Draft button', () => {
       render(<ReplyComposer {...DEFAULT_PROPS} />);

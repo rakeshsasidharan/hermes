@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ReplyComposer } from '@/components/messages/reply-composer';
+import { EMAIL_IFRAME_SANDBOX, prepareEmailHtml } from '@/lib/email-html';
 import {
   useMarkReadStatusMutation,
   useMoveMessageMutation,
@@ -369,8 +370,8 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
               <div>
                 {htmlBody ? (
                   <iframe
-                    srcDoc={htmlBody}
-                    sandbox="allow-same-origin"
+                    srcDoc={prepareEmailHtml(htmlBody)}
+                    sandbox={EMAIL_IFRAME_SANDBOX}
                     className="w-full border-0"
                     style={{ height: iframeHeight }}
                     title="Email body"
