@@ -20,7 +20,7 @@ jest.mock('@/lib/data/addresses', () => ({
 
 import { redirect } from 'next/navigation';
 import { queryAddresses } from '@/lib/data/addresses';
-import DefaultPage from '@/app/(app)/page';
+import { ResolveDefaultAddress } from '@/app/(app)/page';
 
 const mockQueryAddresses = queryAddresses as jest.Mock;
 const mockRedirect = redirect as unknown as jest.Mock;
@@ -37,7 +37,7 @@ describe('DefaultPage', () => {
       { email: 'a@example.com', domain: 'example.com', status: 'active' },
     ]);
 
-    await expect(DefaultPage()).rejects.toThrow('REDIRECT:/inbox/a%40example.com');
+    await expect(ResolveDefaultAddress()).rejects.toThrow('REDIRECT:/inbox/a%40example.com');
     expect(mockRedirect).toHaveBeenCalledWith('/inbox/a%40example.com');
   });
 
@@ -48,7 +48,7 @@ describe('DefaultPage', () => {
       { email: 'b@example.com', domain: 'example.com', status: 'active' },
     ]);
 
-    await expect(DefaultPage()).rejects.toThrow('REDIRECT:/inbox/b%40example.com');
+    await expect(ResolveDefaultAddress()).rejects.toThrow('REDIRECT:/inbox/b%40example.com');
   });
 
   test('falls back to the first active address when the preferred address is no longer active', async () => {
@@ -57,12 +57,12 @@ describe('DefaultPage', () => {
       { email: 'a@example.com', domain: 'example.com', status: 'active' },
     ]);
 
-    await expect(DefaultPage()).rejects.toThrow('REDIRECT:/inbox/a%40example.com');
+    await expect(ResolveDefaultAddress()).rejects.toThrow('REDIRECT:/inbox/a%40example.com');
   });
 
   test('redirects to /settings when there are no active addresses', async () => {
     mockQueryAddresses.mockResolvedValue([]);
 
-    await expect(DefaultPage()).rejects.toThrow('REDIRECT:/settings');
+    await expect(ResolveDefaultAddress()).rejects.toThrow('REDIRECT:/settings');
   });
 });
