@@ -20,7 +20,7 @@ jest.mock('@/lib/data/addresses', () => ({
 
 import { redirect } from 'next/navigation';
 import { queryAddresses } from '@/lib/data/addresses';
-import { ResolveDefaultAddress } from '@/app/(app)/page';
+import { ResolveDefaultAddress } from '@/app/(app)/resolve-default-address';
 
 const mockQueryAddresses = queryAddresses as jest.Mock;
 const mockRedirect = redirect as unknown as jest.Mock;
@@ -30,7 +30,7 @@ beforeEach(() => {
   mockCookiesGet.mockReturnValue(undefined);
 });
 
-describe('DefaultPage', () => {
+describe('ResolveDefaultAddress', () => {
   test('redirects to the alphabetically-first active address when no preference is set', async () => {
     mockQueryAddresses.mockResolvedValue([
       { email: 'b@example.com', domain: 'example.com', status: 'active' },
