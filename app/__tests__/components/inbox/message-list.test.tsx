@@ -2,6 +2,7 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MessageList } from '@/components/inbox/message-list';
 import type { WsNewMessageEvent } from '@/lib/ws';
+import type { Message } from '@/store/api';
 
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn().mockReturnValue({ push: jest.fn(), refresh: jest.fn() }),
@@ -19,7 +20,7 @@ jest.mock('@/components/ws-context', () => ({
 }));
 
 // Module-level shared state for RTK mock
-let mockMessages: ReturnType<typeof buildMessages>;
+let mockMessages: Message[];
 let mockNextCursor: string | null = null;
 let triggerRender: (() => void) | null = null;
 
@@ -30,9 +31,9 @@ const mockTriggerLoadMore = jest.fn();
 const mockDispatch = jest.fn((action: unknown) => action);
 
 const mockUpdateQueryData = jest.fn(
-  (_endpoint: string, _args: unknown, updater: (d: { messages: typeof INBOUND_MESSAGES; nextCursor: string | null }) => void) => {
+  (_endpoint: string, _args: unknown, updater: (d: { messages: Message[]; nextCursor: string | null }) => void) => {
     const draft = { messages: mockMessages, nextCursor: mockNextCursor };
-    updater(draft as unknown as { messages: typeof INBOUND_MESSAGES; nextCursor: string | null });
+    updater(draft);
     mockMessages = draft.messages;
     mockNextCursor = draft.nextCursor;
     triggerRender?.();
@@ -70,9 +71,7 @@ jest.mock('@/store/api', () => {
   };
 });
 
-function buildMessages<T extends readonly unknown[]>(arr: T) { return arr as unknown as typeof INBOUND_MESSAGES; }
-
-const INBOUND_MESSAGES = [
+const INBOUND_MESSAGES: Message[] = [
   {
     messageId: 'msg-1',
     address: 'hello@example.com',
@@ -95,7 +94,7 @@ const INBOUND_MESSAGES = [
   },
 ];
 
-const OUTBOUND_MESSAGES = [
+const OUTBOUND_MESSAGES: Message[] = [
   {
     messageId: 'msg-out',
     address: 'hello@example.com',
@@ -129,7 +128,7 @@ type MessageListProps = {
   address: string;
   direction: 'inbound' | 'outbound';
   folder?: 'inbox' | 'junk' | 'trash';
-  initialMessages: typeof INBOUND_MESSAGES;
+  initialMessages: Message[];
   initialNextCursor: string | null;
   folderLabel: string;
 };
@@ -145,9 +144,9 @@ function setupMutationMocks() {
         'getMessages',
         { address: fromAddress, folder: fromFolder, direction: fromDirection },
         (draft) => {
-          draft.messages = (draft.messages as typeof INBOUND_MESSAGES).filter(
+          draft.messages = (draft.messages as Message[]).filter(
             (m) => m.messageId !== messageId,
-          ) as typeof INBOUND_MESSAGES;
+          ) as Message[];
         },
       );
       const res = await (global.fetch as jest.Mock)(
@@ -173,7 +172,7 @@ function setupMutationMocks() {
         'getMessages',
         { address, folder, direction },
         (draft) => {
-          const m = (draft.messages as typeof INBOUND_MESSAGES).find((msg) => msg.messageId === messageId);
+          const m = (draft.messages as Message[]).find((msg) => msg.messageId === messageId);
           if (m) (m as { isRead: boolean }).isRead = isRead;
         },
       );
@@ -199,9 +198,9 @@ function setupMutationMocks() {
         'getMessages',
         { address, folder, direction },
         (draft) => {
-          draft.messages = (draft.messages as typeof INBOUND_MESSAGES).filter(
+          draft.messages = (draft.messages as Message[]).filter(
             (m) => m.messageId !== messageId,
-          ) as typeof INBOUND_MESSAGES;
+          ) as Message[];
         },
       );
       const res = await (global.fetch as jest.Mock)(
@@ -227,8 +226,8 @@ function setupMutationMocks() {
       if (cursor) params.set('cursor', cursor);
       const res = await (global.fetch as jest.Mock)(`/api/messages?${params.toString()}`);
       if (res && (res as { ok: boolean }).ok) {
-        const data = await (res as { json: () => Promise<{ messages: typeof INBOUND_MESSAGES; nextCursor: string | null }> }).json();
-        mockMessages = [...mockMessages, ...data.messages] as typeof INBOUND_MESSAGES;
+        const data = await (res as { json: () => Promise<{ messages: Message[]; nextCursor: string | null }> }).json();
+        mockMessages = [...mockMessages, ...data.messages] as Message[];
         mockNextCursor = data.nextCursor;
         triggerRender?.();
       }
@@ -238,16 +237,16 @@ function setupMutationMocks() {
 
 function renderWithMessages(
   props: MessageListProps,
-  messages: typeof INBOUND_MESSAGES = INBOUND_MESSAGES,
+  messages: Message[] = INBOUND_MESSAGES,
   nextCursor: string | null = null,
 ) {
-  mockMessages = messages.map((m) => ({ ...m })) as typeof INBOUND_MESSAGES;
+  mockMessages = messages.map((m) => ({ ...m })) as Message[];
   mockNextCursor = nextCursor;
   return render(<MessageList {...props} />);
 }
 
 beforeEach(() => {
-  mockMessages = INBOUND_MESSAGES.map((m) => ({ ...m })) as typeof INBOUND_MESSAGES;
+  mockMessages = INBOUND_MESSAGES.map((m) => ({ ...m })) as Message[];
   mockNextCursor = null;
   triggerRender = null;
   global.fetch = jest.fn();
@@ -282,7 +281,7 @@ describe('MessageList — inbox (inbound)', () => {
 
   test('falls back to sender field when from is absent', () => {
     const msg = [{ ...INBOUND_MESSAGES[0], from: undefined, sender: 'legacy@test.com' }];
-    renderWithMessages(DEFAULT_INBOUND_PROPS, msg as typeof INBOUND_MESSAGES);
+    renderWithMessages(DEFAULT_INBOUND_PROPS, msg as Message[]);
     expect(screen.getByText('legacy@test.com')).toBeInTheDocument();
   });
 
@@ -371,7 +370,7 @@ describe('MessageList — sent (outbound)', () => {
 
   test('does not show unread badge for outbound messages', () => {
     const unread = [{ ...OUTBOUND_MESSAGES[0], isRead: false }];
-    renderWithMessages(DEFAULT_OUTBOUND_PROPS, unread as typeof INBOUND_MESSAGES);
+    renderWithMessages(DEFAULT_OUTBOUND_PROPS, unread as Message[]);
     expect(screen.queryByLabelText('Unread')).not.toBeInTheDocument();
   });
 
@@ -485,12 +484,12 @@ describe('MessageList — folder prop (trash)', () => {
 describe('MessageList — card layout', () => {
   test('renders message snippet when provided', () => {
     const msgs = [{ ...INBOUND_MESSAGES[0], snippet: 'This is a preview of the email body' }];
-    renderWithMessages(DEFAULT_INBOUND_PROPS, msgs as typeof INBOUND_MESSAGES);
+    renderWithMessages(DEFAULT_INBOUND_PROPS, msgs as Message[]);
     expect(screen.getByText('This is a preview of the email body')).toBeInTheDocument();
   });
 
   test('does not render snippet element when snippet is absent', () => {
-    renderWithMessages(DEFAULT_INBOUND_PROPS, [{ ...INBOUND_MESSAGES[0], snippet: undefined }] as typeof INBOUND_MESSAGES);
+    renderWithMessages(DEFAULT_INBOUND_PROPS, [{ ...INBOUND_MESSAGES[0], snippet: undefined }] as Message[]);
     expect(screen.queryByTestId('message-snippet')).not.toBeInTheDocument();
   });
 
@@ -568,7 +567,7 @@ describe('MessageList — shared', () => {
     useRouter.mockReturnValue({ push: jest.fn(), refresh: jest.fn() });
     const unreadOutbound = [{ ...OUTBOUND_MESSAGES[0], isRead: false }];
     const user = userEvent.setup();
-    renderWithMessages(DEFAULT_OUTBOUND_PROPS, unreadOutbound as typeof INBOUND_MESSAGES);
+    renderWithMessages(DEFAULT_OUTBOUND_PROPS, unreadOutbound as Message[]);
     await user.click(screen.getByTestId('message-row-msg-out'));
     expect(screen.queryByLabelText('Unread')).not.toBeInTheDocument();
   });
@@ -712,7 +711,7 @@ describe('MessageList — bulk action toolbar', () => {
     (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({}) });
     const user = userEvent.setup();
     const allRead = INBOUND_MESSAGES.map((m) => ({ ...m, isRead: true }));
-    renderWithMessages(DEFAULT_INBOUND_PROPS, allRead as typeof INBOUND_MESSAGES);
+    renderWithMessages(DEFAULT_INBOUND_PROPS, allRead as Message[]);
     expect(screen.queryByLabelText('Unread')).not.toBeInTheDocument();
     await user.click(screen.getByTestId('select-all-checkbox'));
     await user.click(screen.getByTestId('bulk-mark-unread-button'));

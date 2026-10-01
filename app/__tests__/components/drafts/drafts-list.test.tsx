@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DraftsList } from '@/components/drafts/drafts-list';
+import type { Draft } from '@/store/api';
 
 const mockPush = jest.fn();
 const mockPathname = jest.fn().mockReturnValue('/drafts/me%40hermes.com');
@@ -19,8 +20,8 @@ jest.mock('react-redux', () => ({
   useDispatch: () => mockDispatch,
 }));
 
-const mockUpdateQueryData = jest.fn(() => ({ type: 'test/patch', undo: jest.fn() }));
-const mockInvalidateTags = jest.fn(() => ({ type: 'test/invalidate' }));
+const mockUpdateQueryData = jest.fn((...args: unknown[]) => ({ type: 'test/patch', undo: jest.fn() }));
+const mockInvalidateTags = jest.fn((...args: unknown[]) => ({ type: 'test/invalidate' }));
 
 jest.mock('@/store/api', () => ({
   useGetDraftsQuery: jest.fn(),
@@ -55,14 +56,14 @@ const REPLY_DRAFT = {
   updatedAt: '2026-05-10T11:00:00.000Z',
 };
 
-const NO_SUBJECT_DRAFT = {
+const NO_SUBJECT_DRAFT: Draft = {
   draftId: 'draft-no-subject',
   to: 'someone@example.com',
   from: 'me@hermes.com',
   updatedAt: '2026-05-10T09:00:00.000Z',
 };
 
-function mockQuery(drafts: typeof COMPOSE_DRAFT[], isLoading = false) {
+function mockQuery(drafts: Draft[], isLoading = false) {
   (useGetDraftsQuery as jest.Mock).mockReturnValue({ data: { drafts }, isLoading });
 }
 
@@ -126,8 +127,8 @@ describe('DraftsList', () => {
   });
 
   test('shows "No recipient" when to is missing', () => {
-    const draft = { ...COMPOSE_DRAFT, to: undefined };
-    mockQuery([draft as typeof COMPOSE_DRAFT]);
+    const draft: Draft = { ...COMPOSE_DRAFT, to: undefined };
+    mockQuery([draft]);
     render(<DraftsList address={ADDRESS} />);
     expect(screen.getByText('No recipient')).toBeInTheDocument();
   });

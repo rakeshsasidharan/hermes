@@ -56,7 +56,9 @@ const ADDRESSES = [
 let store: ReturnType<typeof makeStore>;
 let invalidateTagsSpy: jest.SpyInstance;
 
-function renderSidebar(addresses = ADDRESSES) {
+function renderSidebar(
+  addresses: { email: string; domain: string; status: string; unreadCount?: number }[] = ADDRESSES,
+) {
   return render(
     <Provider store={store}>
       <SidebarProvider>
