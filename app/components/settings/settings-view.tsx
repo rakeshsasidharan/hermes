@@ -17,7 +17,6 @@ import {
 import {
   Globe,
   AtSign,
-  Mail,
   Clock,
   ChevronDown,
   Plus,
@@ -115,7 +114,11 @@ export function SettingsView({
   function toggleDomain(d: string) {
     setOpenDomains((prev) => {
       const next = new Set(prev);
-      next.has(d) ? next.delete(d) : next.add(d);
+      if (next.has(d)) {
+        next.delete(d);
+      } else {
+        next.add(d);
+      }
       return next;
     });
   }

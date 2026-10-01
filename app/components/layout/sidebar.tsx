@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -66,7 +67,7 @@ function extractSelectedAddress(pathname: string): string | null {
   return match ? decodeURIComponent(match[2]) : null;
 }
 
-function FolderLinkInner({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
+function FolderLinkInner({ icon: Icon }: { icon: React.ElementType; label: string }) {
   const { pending } = useLinkStatus();
   return pending ? <Loader2 className="animate-spin" /> : <Icon />;
 }
@@ -190,7 +191,13 @@ export function AppSidebar({ addresses }: AppSidebarProps) {
             <SidebarMenuButton size="lg" asChild tooltip="Hermes">
               <Link href="/">
                 <div className="flex aspect-square shrink-0 items-center justify-center">
-                  <img src="/icon.svg" alt="Hermes" className="size-8 shrink-0 rounded-lg" />
+                  <Image
+                    src="/icon.svg"
+                    alt="Hermes"
+                    width={32}
+                    height={32}
+                    className="size-8 shrink-0 rounded-lg"
+                  />
                 </div>
                 <div className="flex flex-col gap-0.5 leading-none">
                   <span className="text-base font-semibold">Hermes</span>

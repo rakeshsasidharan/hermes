@@ -15,8 +15,8 @@ jest.mock('next/navigation', () => ({
 
 const mockSendEmailUnwrap = jest.fn().mockResolvedValue({ messageId: 'new-msg' });
 const mockSendEmail = jest.fn(() => ({ unwrap: mockSendEmailUnwrap }));
-const mockInvalidateTags = jest.fn(() => ({ type: 'test/invalidate' }));
-const mockUpdateQueryData = jest.fn(() => ({ type: 'test/update' }));
+const mockInvalidateTags = jest.fn((...args: unknown[]) => ({ type: 'test/invalidate' }));
+const mockUpdateQueryData = jest.fn((...args: unknown[]) => ({ type: 'test/update' }));
 jest.mock('@/store/api', () => ({
   useSendEmailMutation: () => [mockSendEmail],
   apiSlice: {

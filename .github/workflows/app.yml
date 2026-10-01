@@ -41,6 +41,14 @@ jobs:
         working-directory: app
         run: npm ci
 
+      - name: Type-check app
+        working-directory: app
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Lint app
+        working-directory: app
+        run: npm run lint
+
       - name: Run app tests
         working-directory: app
         run: npm test -- --no-coverage

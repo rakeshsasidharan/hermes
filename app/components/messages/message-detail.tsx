@@ -100,7 +100,7 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
     }).then((result) => {
       if (result && 'error' in result) setIsRead(false);
     });
-  }, [message.messageId, message.isRead, showReadToggle]);
+  }, [message.messageId, message.isRead, showReadToggle, fromAddress, fromFolder, fromDirection, markReadStatus]);
 
   async function toggleRead() {
     const next = !isRead;
