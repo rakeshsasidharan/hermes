@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, ScanCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 
@@ -13,7 +14,7 @@ function getDynamo() {
   return DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.AWS_REGION ?? 'us-east-1' }));
 }
 
-export async function queryAddresses(): Promise<Address[]> {
+export const queryAddresses = cache(async (): Promise<Address[]> => {
   const dynamo = getDynamo();
 
   const result = await dynamo.send(new ScanCommand({
@@ -44,4 +45,4 @@ export async function queryAddresses(): Promise<Address[]> {
       }
     }),
   );
-}
+});
