@@ -7,7 +7,9 @@ const MAILBOX_PATTERN = /^\/(inbox|sent|drafts|junk|trash)\//;
 
 export function ConditionalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isMailbox = MAILBOX_PATTERN.test(pathname);
+  // `/` only ever renders the inbox skeleton while redirecting to the default
+  // inbox, so it shares the mailbox wrapper to avoid a layout shift.
+  const isMailbox = pathname === '/' || MAILBOX_PATTERN.test(pathname);
 
   return (
     <>

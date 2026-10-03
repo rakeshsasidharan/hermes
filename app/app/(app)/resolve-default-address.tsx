@@ -1,9 +1,11 @@
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 import { PREFERRED_ADDRESS_COOKIE } from '@/lib/preferences';
 import { queryAddresses } from '@/lib/data/addresses';
+import { InboxSkeleton } from '@/components/inbox/inbox-skeleton';
+import { DefaultAddressRedirect } from './default-address-redirect';
 
-export async function ResolveDefaultAddress(): Promise<never> {
+export async function ResolveDefaultAddress() {
   const cookieStore = await cookies();
   const preferredAddress = cookieStore.get(PREFERRED_ADDRESS_COOKIE)?.value;
 
@@ -20,8 +22,18 @@ export async function ResolveDefaultAddress(): Promise<never> {
       preferredAddress && active.some((a) => a.email === preferredAddress)
         ? preferredAddress
         : active[0].email;
-    redirect(`/inbox/${encodeURIComponent(target)}`);
+    return (
+      <DefaultAddressRedirect href={`/inbox/${encodeURIComponent(target)}`}>
+        <InboxSkeleton />
+      </DefaultAddressRedirect>
+    );
   }
 
-  redirect('/settings');
+  return (
+    <DefaultAddressRedirect href="/settings">
+      <div className="flex flex-1 items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    </DefaultAddressRedirect>
+  );
 }
