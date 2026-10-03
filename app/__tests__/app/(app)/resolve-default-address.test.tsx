@@ -8,22 +8,25 @@ jest.mock('next/headers', () => ({
   cookies: jest.fn(() => Promise.resolve({ get: mockCookiesGet })),
 }));
 
-jest.mock('next/navigation', () => ({
-  redirect: jest.fn((url: string) => {
-    throw new Error(`REDIRECT:${url}`);
-  }),
-}));
-
 jest.mock('@/lib/data/addresses', () => ({
   queryAddresses: jest.fn(),
 }));
 
-import { redirect } from 'next/navigation';
+import type { ReactElement } from 'react';
 import { queryAddresses } from '@/lib/data/addresses';
+import { InboxSkeleton } from '@/components/inbox/inbox-skeleton';
 import { ResolveDefaultAddress } from '@/app/(app)/resolve-default-address';
+import { DefaultAddressRedirect } from '@/app/(app)/default-address-redirect';
 
 const mockQueryAddresses = queryAddresses as jest.Mock;
-const mockRedirect = redirect as unknown as jest.Mock;
+
+type RedirectElement = ReactElement<{ href: string; children: ReactElement }>;
+
+async function resolve(): Promise<RedirectElement> {
+  const element = (await ResolveDefaultAddress()) as RedirectElement;
+  expect(element.type).toBe(DefaultAddressRedirect);
+  return element;
+}
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -37,8 +40,8 @@ describe('ResolveDefaultAddress', () => {
       { email: 'a@example.com', domain: 'example.com', status: 'active' },
     ]);
 
-    await expect(ResolveDefaultAddress()).rejects.toThrow('REDIRECT:/inbox/a%40example.com');
-    expect(mockRedirect).toHaveBeenCalledWith('/inbox/a%40example.com');
+    const element = await resolve();
+    expect(element.props.href).toBe('/inbox/a%40example.com');
   });
 
   test('redirects to the preferred address when it is still active', async () => {
@@ -48,7 +51,8 @@ describe('ResolveDefaultAddress', () => {
       { email: 'b@example.com', domain: 'example.com', status: 'active' },
     ]);
 
-    await expect(ResolveDefaultAddress()).rejects.toThrow('REDIRECT:/inbox/b%40example.com');
+    const element = await resolve();
+    expect(element.props.href).toBe('/inbox/b%40example.com');
   });
 
   test('falls back to the first active address when the preferred address is no longer active', async () => {
@@ -57,12 +61,34 @@ describe('ResolveDefaultAddress', () => {
       { email: 'a@example.com', domain: 'example.com', status: 'active' },
     ]);
 
-    await expect(ResolveDefaultAddress()).rejects.toThrow('REDIRECT:/inbox/a%40example.com');
+    const element = await resolve();
+    expect(element.props.href).toBe('/inbox/a%40example.com');
+  });
+
+  test('ignores addresses with deleted status', async () => {
+    mockQueryAddresses.mockResolvedValue([
+      { email: 'a@example.com', domain: 'example.com', status: 'deleted' },
+      { email: 'b@example.com', domain: 'example.com', status: 'active' },
+    ]);
+
+    const element = await resolve();
+    expect(element.props.href).toBe('/inbox/b%40example.com');
+  });
+
+  test('keeps the inbox skeleton on screen while redirecting to an inbox', async () => {
+    mockQueryAddresses.mockResolvedValue([
+      { email: 'a@example.com', domain: 'example.com', status: 'active' },
+    ]);
+
+    const element = await resolve();
+    expect(element.props.children.type).toBe(InboxSkeleton);
   });
 
   test('redirects to /settings when there are no active addresses', async () => {
     mockQueryAddresses.mockResolvedValue([]);
 
-    await expect(ResolveDefaultAddress()).rejects.toThrow('REDIRECT:/settings');
+    const element = await resolve();
+    expect(element.props.href).toBe('/settings');
+    expect(element.props.children.type).not.toBe(InboxSkeleton);
   });
 });
