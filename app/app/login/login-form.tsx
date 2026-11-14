@@ -1,46 +1,54 @@
 'use client';
 
-import { useTransition, useState, useEffect } from 'react';
+import { useActionState, useEffect, useState, startTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { loginAction } from './actions';
+import { loginAction, type LoginState } from './actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2 } from 'lucide-react';
 
+const INITIAL_STATE: LoginState = {};
+
 export function LoginForm() {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | undefined>(undefined);
-  const [success, setSuccess] = useState(false);
+  // The server action is bound to the form's `action` so React server-renders
+  // it as a POST. A submit that lands before hydration therefore still POSTs
+  // to the server action instead of falling back to a native GET that would
+  // put the credentials in the URL query string (see #266).
+  const [state, formAction, isPending] = useActionState(loginAction, INITIAL_STATE);
   const [password, setPassword] = useState('');
+  const [handledState, setHandledState] = useState(state);
+
+  if (state !== handledState) {
+    setHandledState(state);
+    if (state.error) {
+      setPassword('');
+    }
+  }
 
   useEffect(() => {
-    if (success) {
+    if (state.success) {
       router.push('/');
     }
-  }, [success, router]);
+  }, [state.success, router]);
 
-  const isLoading = isPending || success;
+  const isLoading = isPending || Boolean(state.success);
+  const error = isPending ? undefined : state.error;
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    // Once hydrated, dispatch the action manually so React does not reset the
+    // form afterwards — the username should survive a failed attempt.
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    setError(undefined);
-    startTransition(async () => {
-      const result = await loginAction({}, formData);
-      if (result.error) {
-        setError(result.error);
-        setPassword('');
-      } else if (result.success) {
-        setSuccess(true);
-      }
+    startTransition(() => {
+      formAction(formData);
     });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form action={formAction} onSubmit={handleSubmit} className="space-y-4">
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
