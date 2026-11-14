@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { KeyRound, Copy, Check, Trash2, Plus, Loader2 } from 'lucide-react';
+import { LocalTime } from '@/components/local-time';
 
 interface ApiKey {
   keyId: string;
@@ -167,7 +168,7 @@ export function ApiKeysDialog({ email }: ApiKeysDialogProps) {
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Created {new Date(k.createdAt).toLocaleDateString()}
+                      Created <LocalTime iso={k.createdAt} format="date" />
                     </p>
                   </div>
                   <Button

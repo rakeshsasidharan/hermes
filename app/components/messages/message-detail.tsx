@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ReplyComposer } from '@/components/messages/reply-composer';
+import { LocalTime } from '@/components/local-time';
 import { EMAIL_IFRAME_SANDBOX, prepareEmailHtml } from '@/lib/email-html';
 import {
   useMarkReadStatusMutation,
@@ -219,7 +220,7 @@ export function MessageDetail({ message, initialHtmlBody, initialTextBody, initi
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           <span className="text-sm font-semibold truncate">{message.subject}</span>
           <span className="text-xs text-muted-foreground truncate">
-            {message.from ?? message.sender} · {new Date(message.receivedAt).toLocaleString()}
+            {message.from ?? message.sender} · <LocalTime iso={message.receivedAt} format="datetime" />
           </span>
         </div>
 

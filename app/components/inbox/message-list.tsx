@@ -6,7 +6,8 @@ import { useDispatch } from 'react-redux';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useWs } from '@/components/ws-context';
-import { MailboxCard, formatMailboxDate } from '@/components/mailbox-card';
+import { MailboxCard } from '@/components/mailbox-card';
+import { LocalTime } from '@/components/local-time';
 import { BulkActionToolbar } from '@/components/bulk-action-toolbar';
 import {
   useGetMessagesQuery,
@@ -285,7 +286,7 @@ export function MessageList({ address, direction, folder, initialMessages, initi
                     isUnread={isUnread}
                     isSelected={selectedIds.has(msg.messageId)}
                     displayName={displayName}
-                    date={formatMailboxDate(msg.receivedAt)}
+                    date={<LocalTime iso={msg.receivedAt} format="mailbox" />}
                     subject={msg.subject}
                     snippet={msg.snippet}
                     hasAttachments={(msg.attachments?.length ?? 0) > 0}
