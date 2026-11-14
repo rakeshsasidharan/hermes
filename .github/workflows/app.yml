@@ -219,8 +219,13 @@ jobs:
           REGISTRY: ${{ steps.ecr-login.outputs.registry }}
         run: |
           IMAGE_URI="$REGISTRY/$ECR_REPO"
+          # Lambda only accepts a single image manifest. Without these flags
+          # buildx attaches provenance/SBOM attestations and pushes an OCI
+          # image index, which Lambda rejects (see #264).
           docker buildx build \
             --platform linux/amd64 \
+            --provenance=false \
+            --sbom=false \
             --push \
             --tag "$IMAGE_URI:${{ github.sha }}" \
             --tag "$IMAGE_URI:latest" \
