@@ -354,6 +354,41 @@ describe('MessageList — inbox (inbound)', () => {
     });
     await waitFor(() => expect(screen.getByText('ws-sender@test.com')).toBeInTheDocument());
   });
+
+  // Regression guard for read/unread sync (#183, #189, #243, #262): a realtime
+  // event must only read the new record — never PATCH read state or change
+  // isRead on messages already in the list.
+  test('WebSocket event does not alter read state of existing messages', async () => {
+    const existing: Message[] = [
+      { ...INBOUND_MESSAGES[0], messageId: 'read-1', isRead: true },
+      { ...INBOUND_MESSAGES[1], messageId: 'unread-1', isRead: false },
+    ];
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        message: {
+          messageId: 'msg-ws3',
+          address: 'hello@example.com',
+          from: 'new@test.com',
+          subject: 'Fresh',
+          receivedAt: new Date().toISOString(),
+          isRead: false,
+        },
+      }),
+    });
+    renderWithMessages(DEFAULT_INBOUND_PROPS, existing);
+    act(() => {
+      wsHandler?.({ type: 'new_message', address: 'hello@example.com', messageId: 'msg-ws3' });
+    });
+    await waitFor(() => expect(screen.getByText('new@test.com')).toBeInTheDocument());
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledWith('/api/messages/msg-ws3');
+    expect(mockMarkReadStatus).not.toHaveBeenCalled();
+    expect(mockMessages.find((m) => m.messageId === 'read-1')?.isRead).toBe(true);
+    expect(mockMessages.find((m) => m.messageId === 'unread-1')?.isRead).toBe(false);
+    expect(mockMessages[0].messageId).toBe('msg-ws3');
+  });
 });
 
 describe('MessageList — sent (outbound)', () => {
