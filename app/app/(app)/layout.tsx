@@ -16,7 +16,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   const addresses = await queryAddresses();
-  const wsEndpoint = process.env.NEXT_PUBLIC_WEBSOCKET_ENDPOINT ?? '';
+  // Read at request time from the Lambda environment. Deliberately not a
+  // NEXT_PUBLIC_* variable: Next.js inlines those at build time (server code
+  // included), which silently baked an empty endpoint into production (#262).
+  const wsEndpoint = process.env.WEBSOCKET_ENDPOINT ?? '';
 
   const sidebarStateCookie = cookieStore.get(SIDEBAR_STATE_COOKIE)?.value;
   const defaultSidebarOpen = sidebarStateCookie === undefined ? true : sidebarStateCookie === 'true';
