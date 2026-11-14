@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { LoginForm } from '@/app/login/login-form';
 
@@ -65,6 +65,67 @@ describe('LoginForm', () => {
     });
   });
 
+  test('keeps the username after a failed login', async () => {
+    mockLoginAction.mockResolvedValueOnce({ error: 'Invalid username or password.' });
+
+    const user = userEvent.setup();
+    render(<LoginForm />);
+
+    await user.type(screen.getByLabelText(/username/i), 'admin');
+    await user.type(screen.getByLabelText(/password/i), 'wrongpass');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Invalid username or password.')).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText(/username/i)).toHaveValue('admin');
+  });
+
+  test('submits username and password as form data to the login action', async () => {
+    mockLoginAction.mockResolvedValueOnce({ success: true });
+
+    const user = userEvent.setup();
+    render(<LoginForm />);
+
+    await user.type(screen.getByLabelText(/username/i), 'admin');
+    await user.type(screen.getByLabelText(/password/i), 'secret');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(mockLoginAction).toHaveBeenCalledTimes(1);
+    });
+    const formData = mockLoginAction.mock.calls[0][1] as FormData;
+    expect(formData.get('username')).toBe('admin');
+    expect(formData.get('password')).toBe('secret');
+  });
+
+  test('hides the previous error while a retry is in flight', async () => {
+    mockLoginAction.mockResolvedValueOnce({ error: 'Invalid username or password.' });
+    let resolveRetry!: (v: unknown) => void;
+    mockLoginAction.mockImplementationOnce(() => new Promise((res) => { resolveRetry = res; }));
+
+    const user = userEvent.setup();
+    render(<LoginForm />);
+
+    await user.type(screen.getByLabelText(/username/i), 'admin');
+    await user.type(screen.getByLabelText(/password/i), 'wrongpass');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+
+    await user.type(screen.getByLabelText(/password/i), 'rightpass');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    await act(async () => {
+      resolveRetry({ success: true });
+    });
+  });
+
   test('redirects to / on successful login', async () => {
     mockLoginAction.mockResolvedValueOnce({ success: true });
 
@@ -113,7 +174,9 @@ describe('LoginForm', () => {
       expect(screen.getByLabelText(/password/i)).toBeDisabled();
     });
 
-    resolveAction({ success: true });
+    await act(async () => {
+      resolveAction({ success: true });
+    });
   });
 
   test('button stays disabled after success state before navigation', async () => {
