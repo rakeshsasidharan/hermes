@@ -9,7 +9,7 @@ export interface MailboxCardProps {
   isUnread?: boolean;
   isSelected?: boolean;
   displayName: string;
-  date: string;
+  date: React.ReactNode;
   subject?: string;
   snippet?: string;
   hasAttachments?: boolean;
@@ -102,13 +102,4 @@ export function MailboxCard({
       </div>
     </div>
   );
-}
-
-export function formatMailboxDate(iso: string): string {
-  const date = new Date(iso);
-  const now = new Date();
-  if (date.toDateString() === now.toDateString()) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }

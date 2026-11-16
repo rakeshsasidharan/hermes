@@ -27,6 +27,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { LocalTime } from '@/components/local-time';
 import { AddDomainDialog } from '@/components/domains/add-domain-dialog';
 import { AddAddressDialog } from '@/components/addresses/add-address-dialog';
 import { DeleteAddressDialog } from '@/components/addresses/delete-address-dialog';
@@ -66,15 +67,6 @@ interface SettingsViewProps {
   addresses: Address[];
   messageCounts: { total: number; unread: number };
   recentMessages: Message[];
-}
-
-function formatRelativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
 }
 
 function pad2(n: number): string {
@@ -456,7 +448,7 @@ export function SettingsView({
                     </div>
                     <div className="flex items-center gap-1 shrink-0 text-xs text-muted-foreground">
                       <Clock className="h-3 w-3" />
-                      {formatRelativeTime(msg.receivedAt)}
+                      <LocalTime iso={msg.receivedAt} format="relative" />
                     </div>
                   </Link>
                 </li>
@@ -518,7 +510,7 @@ function AddressRow({ addr, onDisplayNameSaved, onDeleted }: AddressRowProps) {
             {addr.status}
           </Badge>
           <span className="text-xs text-muted-foreground shrink-0">
-            Added {new Date(addr.createdAt).toLocaleDateString()}
+            Added <LocalTime iso={addr.createdAt} format="date" />
           </span>
         </div>
 

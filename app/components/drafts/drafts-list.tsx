@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { FileText, Loader2 } from 'lucide-react';
-import { MailboxCard, formatMailboxDate } from '@/components/mailbox-card';
+import { MailboxCard } from '@/components/mailbox-card';
+import { LocalTime } from '@/components/local-time';
 import { BulkActionToolbar } from '@/components/bulk-action-toolbar';
 import { tryNavigate } from '@/lib/navigation-guard';
 import { useGetDraftsQuery, apiSlice, type Draft } from '@/store/api';
@@ -152,7 +153,7 @@ export function DraftsList({ address }: DraftsListProps) {
                 isLoading={draft.draftId === pendingDraftId}
                 isSelected={selectedIds.has(draft.draftId)}
                 displayName={draft.to?.trim() || 'No recipient'}
-                date={formatMailboxDate(draft.updatedAt)}
+                date={<LocalTime iso={draft.updatedAt} format="mailbox" />}
                 subject={draft.subject?.trim() || '(no subject)'}
                 onClick={() => handleDraftClick(draft)}
                 onSelectToggle={() => handleSelectToggle(draft.draftId)}
